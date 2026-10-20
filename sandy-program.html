@@ -7,10 +7,10 @@
 <body>
 <h1>SANDY — the program</h1>
 <p>The complete source of Sandy (package com.talacore.talatv), the free media player built by James Cochrum with Pearl — gathered into ONE HTML file: the paper-brain form, portable and inspectable, feedable into any code space.</p>
-<p>Snapshot of the shipped v0.16.0 tree (THE READER + ARCHIVE BOOKS), 2026-10-19 15:24 CDT. 174 source files, 2,213,731 bytes of source. Same program the APKs are built from; same signing line; free as in freedom — a copy makes a holder, never an owner.</p>
+<p>Snapshot of the shipped v0.16.1 tree (THE INSTALLER’S FACE), 2026-10-20 03:51 CDT. 174 source files, 2,214,367 bytes of source. Same program the APKs are built from; same signing line; free as in freedom — a copy makes a holder, never an owner.</p>
 <h2>Files</h2>
 <ol>
-<li><a href="#app/AndroidManifest.xml">app/AndroidManifest.xml</a> (12,767 bytes)</li>
+<li><a href="#app/AndroidManifest.xml">app/AndroidManifest.xml</a> (13,403 bytes)</li>
 <li><a href="#app/src/com/talacore/talatv/ActivePinger.java">app/src/com/talacore/talatv/ActivePinger.java</a> (13,373 bytes)</li>
 <li><a href="#app/src/com/talacore/talatv/AudioPcmDecoder.java">app/src/com/talacore/talatv/AudioPcmDecoder.java</a> (7,900 bytes)</li>
 <li><a href="#app/src/com/talacore/talatv/AutoPlay.java">app/src/com/talacore/talatv/AutoPlay.java</a> (8,687 bytes)</li>
@@ -190,8 +190,8 @@
 &lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
 &lt;manifest xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;
     package=&quot;com.talacore.talatv&quot;
-    android:versionCode=&quot;21&quot;
-    android:versionName=&quot;0.16.0&quot;&gt;
+    android:versionCode=&quot;22&quot;
+    android:versionName=&quot;0.16.1&quot;&gt;
 
     &lt;uses-sdk android:minSdkVersion=&quot;24&quot; android:targetSdkVersion=&quot;34&quot; /&gt;
 
@@ -238,10 +238,18 @@
          The label is the home-screen name; the package stays
          com.talacore.talatv (invisible plumbing) so installs ride over
          0.1–0.3 and every saved favorite/playlist/verdict carries. --&gt;
+    &lt;!-- v0.16.1: THE INSTALLER&#x27;S FACE — installers and file managers
+         read the APPLICATION icon before install, and many cannot
+         draw an adaptive icon at that stage (they fall back to a
+         generic picture). So the application wears a plain PNG
+         (@drawable/ic_installer, the Sandy picture, 512x512), which
+         every installer can draw; the adaptive icon moves onto the
+         launcher activity below, where home screens read it.
+         Diagnosis by Claude, relayed by James 2026-10-19. --&gt;
     &lt;application
         android:label=&quot;Sandy&quot;
-        android:icon=&quot;@mipmap/ic_launcher&quot;
-        android:roundIcon=&quot;@mipmap/ic_launcher_round&quot;
+        android:icon=&quot;@drawable/ic_installer&quot;
+        android:roundIcon=&quot;@drawable/ic_installer&quot;
         android:theme=&quot;@android:style/Theme.Material.NoActionBar&quot;
         android:usesCleartextTraffic=&quot;true&quot;
         android:allowBackup=&quot;false&quot;&gt;
@@ -252,6 +260,8 @@
             android:name=&quot;.SplashActivity&quot;
             android:exported=&quot;true&quot;
             android:theme=&quot;@style/SplashTheme&quot;
+            android:icon=&quot;@mipmap/ic_launcher&quot;
+            android:roundIcon=&quot;@mipmap/ic_launcher_round&quot;
             android:label=&quot;Sandy&quot;&gt;
             &lt;intent-filter&gt;
                 &lt;action android:name=&quot;android.intent.action.MAIN&quot; /&gt;
@@ -6200,7 +6210,7 @@ import java.util.Locale;
 public final class CrashGuard {
 
     /** Version stamp written as the first line of every crash log. */
-    public static final String VERSION_STAMP = &quot;Sandy 0.16.0 (versionCode 21)&quot;;
+    public static final String VERSION_STAMP = &quot;Sandy 0.16.1 (versionCode 22)&quot;;
 
     private static volatile boolean installed = false;
 
@@ -22382,7 +22392,7 @@ import java.util.Map;
  */
 public final class Net {
 
-    public static final String UA = &quot;Sandy/0.16.0&quot;;
+    public static final String UA = &quot;Sandy/0.16.1&quot;;
 
     private Net() {}
 
