@@ -1,0 +1,74 @@
+# Sandy rolling link checker — attention-driven, with decay.
+# Every 2 hours: probe the stalest slice of the active set (declared
+# watchlist, then chosen-facet standing attention, then view-active)
+# and commit the refreshed map back. See ci/linkcheck/README.md.
+# Lean by order: ubuntu-latest only, python3 + curl from the stock
+# image, no caches, no emulator, no extra installs.
+name: linkcheck
+
+on:
+  schedule:
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "rotate | refresh | full"
+        required: true
+        default: "rotate"
+        type: choice
+        options: [rotate, refresh, full]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: linkcheck
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the checker
+        run: |
+          mode="${{ inputs.mode }}"
+          case "$mode" in
+            refresh)
+              python3 ci/linkcheck/rotate.py --refresh-directory \
+                --summary-file ci/linkcheck/last_summary.txt
+              ;;
+            full)
+              python3 ci/linkcheck/rotate.py --slice 20000 \
+                --soft-minutes 240 \
+                --summary-file ci/linkcheck/last_summary.txt
+              ;;
+            *)
+              python3 ci/linkcheck/rotate.py \
+                --summary-file ci/linkcheck/last_summary.txt
+              ;;
+          esac
+          cat ci/linkcheck/last_summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit the map
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci/linkcheck/health.tsv ci/linkcheck/health.tsv.state.json \
+                  ci/linkcheck/last_summary.txt
+          if git diff --cached --quiet; then
+            echo "map unchanged — nothing to commit"
+          else
+            git commit -F ci/linkcheck/last_summary.txt
+            git push
+          fi
+
+      - name: Keep the run summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linkcheck-summary
+          path: ci/linkcheck/last_summary.txt
+          if-no-files-found: ignore
