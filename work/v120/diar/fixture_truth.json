@@ -1,0 +1,131 @@
+{
+ "duration": 81.64,
+ "turns": [
+  {
+   "turn": 0,
+   "speaker": "A",
+   "start": 0.0,
+   "end": 4.725,
+   "text": "The shuttle leaves the station at dawn, and nobody must know our route."
+  },
+  {
+   "turn": 1,
+   "speaker": "B",
+   "start": 5.325,
+   "end": 9.296,
+   "text": "I checked the manifest twice. Every crate is sealed and accounted for."
+  },
+  {
+   "turn": 2,
+   "speaker": "A",
+   "start": 9.796,
+   "end": 14.254,
+   "text": "Good. If the inspector asks, we were never on this platform."
+  },
+  {
+   "turn": 3,
+   "speaker": "C",
+   "start": 14.954,
+   "end": 18.542,
+   "text": "You two worry too much. The south gate has been unguarded for years."
+  },
+  {
+   "turn": 4,
+   "speaker": "B",
+   "start": 18.942,
+   "end": 23.574,
+   "text": "That is exactly what worries me, Daniel. Unguarded gates invite trouble."
+  },
+  {
+   "turn": 5,
+   "speaker": "C",
+   "start": 24.074,
+   "end": 27.476,
+   "text": "Trouble is my middle name, remember? Relax and enjoy the ride."
+  },
+  {
+   "turn": 6,
+   "speaker": "A",
+   "start": 28.076,
+   "end": 32.998,
+   "text": "Enough. Mara, take the lantern and lead us through the service tunnels."
+  },
+  {
+   "turn": 7,
+   "speaker": "B",
+   "start": 33.298,
+   "end": 37.466,
+   "text": "The tunnels flood after midnight. We have maybe twenty minutes of dry floor."
+  },
+  {
+   "turn": 8,
+   "speaker": "C",
+   "start": 37.966,
+   "end": 40.764,
+   "text": "Then we run. I did not bring these boots to keep them clean."
+  },
+  {
+   "turn": 9,
+   "speaker": "A",
+   "start": 41.564,
+   "end": 45.965,
+   "text": "Wait. Do you hear that? Someone is following us through the dark."
+  },
+  {
+   "turn": 10,
+   "speaker": "C",
+   "start": 46.365,
+   "end": 50.068,
+   "text": "Footsteps. Two sets, maybe three. They are not even trying to hide."
+  },
+  {
+   "turn": 11,
+   "speaker": "B",
+   "start": 50.568,
+   "end": 54.051,
+   "text": "It could be the night watch. Or it could be much worse than that."
+  },
+  {
+   "turn": 12,
+   "speaker": "A",
+   "start": 54.651,
+   "end": 58.889,
+   "text": "Kill the lantern. Nobody speaks until I give the signal."
+  },
+  {
+   "turn": 13,
+   "speaker": "B",
+   "start": 60.089,
+   "end": 64.269,
+   "text": "Signal received. Moving to the east corridor now, quiet as mice."
+  },
+  {
+   "turn": 14,
+   "speaker": "C",
+   "start": 64.769,
+   "end": 68.205,
+   "text": "East corridor is clear. Whatever followed us turned back at the gate."
+  },
+  {
+   "turn": 15,
+   "speaker": "A",
+   "start": 68.805,
+   "end": 73.635,
+   "text": "Then we made it. Dawn is coming, and the shuttle will not wait for us."
+  },
+  {
+   "turn": 16,
+   "speaker": "C",
+   "start": 74.035,
+   "end": 77.704,
+   "text": "Next time, Captain, remind me to volunteer for a quieter mission."
+  },
+  {
+   "turn": 17,
+   "speaker": "B",
+   "start": 78.204,
+   "end": 81.64,
+   "text": "There will not be a next time if we miss this departure. Move!"
+  }
+ ]
+}

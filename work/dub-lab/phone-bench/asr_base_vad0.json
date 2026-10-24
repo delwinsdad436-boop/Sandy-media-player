@@ -1,0 +1,448 @@
+{
+ "model": "/home/hatch/workspace/whisper_models/faster-whisper-base",
+ "vad_filter": false,
+ "load_s": 1.94,
+ "transcribe_s": 86.87,
+ "per_chunk": [
+  {
+   "chunk": "chunk_0000.wav",
+   "offset_s": 0.0,
+   "transcribe_s": 54.89,
+   "segments": 15
+  },
+  {
+   "chunk": "chunk_0240.wav",
+   "offset_s": 240.0,
+   "transcribe_s": 15.93,
+   "segments": 35
+  },
+  {
+   "chunk": "chunk_0480.wav",
+   "offset_s": 480.0,
+   "transcribe_s": 16.05,
+   "segments": 10
+  }
+ ],
+ "segments": [
+  {
+   "start": 60.0,
+   "end": 72.5,
+   "text": "ああああ ああああ",
+   "avg_logprob": -2.71,
+   "no_speech_prob": 0.543
+  },
+  {
+   "start": 72.5,
+   "end": 78.74,
+   "text": "う ー",
+   "avg_logprob": -2.71,
+   "no_speech_prob": 0.543
+  },
+  {
+   "start": 78.74,
+   "end": 81.58,
+   "text": "ー",
+   "avg_logprob": -2.71,
+   "no_speech_prob": 0.543
+  },
+  {
+   "start": 81.58,
+   "end": 85.28,
+   "text": "ん",
+   "avg_logprob": -2.71,
+   "no_speech_prob": 0.543
+  },
+  {
+   "start": 145.28,
+   "end": 155.28,
+   "text": "青く果てしなく続く見波の海 屋子の木で囲まれた小さな島島が",
+   "avg_logprob": -0.393,
+   "no_speech_prob": 0.32
+  },
+  {
+   "start": 155.28,
+   "end": 163.78,
+   "text": "閉じゅらのように散らばっている その真ん中に一つ夢のような美しい島があった",
+   "avg_logprob": -0.393,
+   "no_speech_prob": 0.32
+  },
+  {
+   "start": 163.78,
+   "end": 169.54,
+   "text": "その昔 この島はごはの王様がおさめておられた",
+   "avg_logprob": -0.393,
+   "no_speech_prob": 0.32
+  },
+  {
+   "start": 169.54,
+   "end": 176.34,
+   "text": "島の人々は優しいこの王様の元に毎日を楽しく暮らしていた",
+   "avg_logprob": -0.379,
+   "no_speech_prob": 0.008
+  },
+  {
+   "start": 176.34,
+   "end": 180.54,
+   "text": "あるし この島の見なとへ",
+   "avg_logprob": -0.379,
+   "no_speech_prob": 0.008
+  },
+  {
+   "start": 180.54,
+   "end": 186.54,
+   "text": "死になくろうい船が姿を表した",
+   "avg_logprob": -0.379,
+   "no_speech_prob": 0.008
+  },
+  {
+   "start": 199.54,
+   "end": 204.54,
+   "text": "島は立ち待ち上をしたへの王様にとなった",
+   "avg_logprob": -0.753,
+   "no_speech_prob": 0.065
+  },
+  {
+   "start": 212.54,
+   "end": 217.04,
+   "text": "ライン銀はあてつかねき 音の次第を王様へごんじょうした",
+   "avg_logprob": -0.753,
+   "no_speech_prob": 0.065
+  },
+  {
+   "start": 217.04,
+   "end": 224.54,
+   "text": "船から上行くって 偶然消し方したのは 鼻のくがたサブ人である",
+   "avg_logprob": -0.753,
+   "no_speech_prob": 0.065
+  },
+  {
+   "start": 230.54,
+   "end": 237.54,
+   "text": "おなさけずたいごはの王様 私たちは遠い国からファルファルマル",
+   "avg_logprob": -0.464,
+   "no_speech_prob": 0.137
+  },
+  {
+   "start": 237.54,
+   "end": 239.54,
+   "text": "毎日大人でございます",
+   "avg_logprob": -0.464,
+   "no_speech_prob": 0.137
+  },
+  {
+   "start": 240.0,
+   "end": 246.2,
+   "text": "この奥にの人々とどうかながよく 携帯のようにつき合っていただきたいのです",
+   "avg_logprob": -0.433,
+   "no_speech_prob": 0.07
+  },
+  {
+   "start": 246.2,
+   "end": 250.6,
+   "text": "つきましては 俺は毎日船へ帰るのも大変いへ",
+   "avg_logprob": -0.433,
+   "no_speech_prob": 0.07
+  },
+  {
+   "start": 250.6,
+   "end": 256.4,
+   "text": "この島のどこかにわたくしたきの 急速できる土地をゆずりねがいかいのでございますが",
+   "avg_logprob": -0.433,
+   "no_speech_prob": 0.07
+  },
+  {
+   "start": 256.4,
+   "end": 258.2,
+   "text": "いかがでしょう",
+   "avg_logprob": -0.433,
+   "no_speech_prob": 0.07
+  },
+  {
+   "start": 258.2,
+   "end": 264.0,
+   "text": "わたくしたきの船には世界各地の タガロモの巻きししりつり込んでございます",
+   "avg_logprob": -0.433,
+   "no_speech_prob": 0.07
+  },
+  {
+   "start": 264.0,
+   "end": 268.6,
+   "text": "まずペルシャの有名 エリストのタバコ",
+   "avg_logprob": -0.433,
+   "no_speech_prob": 0.07
+  },
+  {
+   "start": 268.8,
+   "end": 272.6,
+   "text": "リンドの王石 シャムの繰りかざい",
+   "avg_logprob": -0.39,
+   "no_speech_prob": 0.017
+  },
+  {
+   "start": 272.6,
+   "end": 276.2,
+   "text": "あんまん看護者のスタラサ シナカントンの茶",
+   "avg_logprob": -0.39,
+   "no_speech_prob": 0.017
+  },
+  {
+   "start": 276.2,
+   "end": 280.4,
+   "text": "同じ区ぺきんの王を嘘して 王も先",
+   "avg_logprob": -0.39,
+   "no_speech_prob": 0.017
+  },
+  {
+   "start": 280.4,
+   "end": 285.2,
+   "text": "これだけのタガロモの陸上げして 王様にご覧に入れたいのでございますが",
+   "avg_logprob": -0.39,
+   "no_speech_prob": 0.017
+  },
+  {
+   "start": 285.2,
+   "end": 288.6,
+   "text": "それにはどうしても並べる土地が 必要でございます",
+   "avg_logprob": -0.39,
+   "no_speech_prob": 0.017
+  },
+  {
+   "start": 288.6,
+   "end": 294.4,
+   "text": "なぁにその広さは一千動画ほどの 大きさがあれば十分でございます",
+   "avg_logprob": -0.39,
+   "no_speech_prob": 0.017
+  },
+  {
+   "start": 295.4,
+   "end": 301.4,
+   "text": "さっそくご視聴くださいまして ありがとうございます",
+   "avg_logprob": -0.462,
+   "no_speech_prob": 0.068
+  },
+  {
+   "start": 301.4,
+   "end": 305.4,
+   "text": "おなさけ深い子はの王様",
+   "avg_logprob": -0.462,
+   "no_speech_prob": 0.068
+  },
+  {
+   "start": 325.4,
+   "end": 331.4,
+   "text": "ん",
+   "avg_logprob": -0.39,
+   "no_speech_prob": 0.444
+  },
+  {
+   "start": 350.4,
+   "end": 353.4,
+   "text": "大人よりの中心に驚かれた 王様が",
+   "avg_logprob": -0.39,
+   "no_speech_prob": 0.444
+  },
+  {
+   "start": 353.4,
+   "end": 357.4,
+   "text": "約束が違うではないかと 戦長に掛け合うと",
+   "avg_logprob": -0.473,
+   "no_speech_prob": 0.003
+  },
+  {
+   "start": 357.4,
+   "end": 365.4,
+   "text": "いやーごおっとんでございます 王様は我が国の消放をご存じないのですが",
+   "avg_logprob": -0.473,
+   "no_speech_prob": 0.003
+  },
+  {
+   "start": 374.4,
+   "end": 378.4,
+   "text": "これが我が国の敷き足りです",
+   "avg_logprob": -0.473,
+   "no_speech_prob": 0.003
+  },
+  {
+   "start": 384.4,
+   "end": 390.4,
+   "text": "ん",
+   "avg_logprob": -0.537,
+   "no_speech_prob": 0.106
+  },
+  {
+   "start": 393.4,
+   "end": 398.4,
+   "text": "ごわの王様は最後までよくたらがった しかしついにはやぶれ",
+   "avg_logprob": -0.537,
+   "no_speech_prob": 0.106
+  },
+  {
+   "start": 398.4,
+   "end": 403.4,
+   "text": "この美しい島も海賊の手に 稼め取られた",
+   "avg_logprob": -0.537,
+   "no_speech_prob": 0.106
+  },
+  {
+   "start": 403.4,
+   "end": 407.4,
+   "text": "千古増えつを入れざるジャングルに 古き責造あり",
+   "avg_logprob": -0.537,
+   "no_speech_prob": 0.106
+  },
+  {
+   "start": 408.4,
+   "end": 414.4,
+   "text": "刻みていわ 別名明る気よる 方法天使の国より",
+   "avg_logprob": -0.494,
+   "no_speech_prob": 0.304
+  },
+  {
+   "start": 414.4,
+   "end": 421.4,
+   "text": "白馬に満たがりたる神の世にいたりて 必ずや民族を開放せん",
+   "avg_logprob": -0.494,
+   "no_speech_prob": 0.304
+  },
+  {
+   "start": 438.4,
+   "end": 444.4,
+   "text": "ん",
+   "avg_logprob": -0.993,
+   "no_speech_prob": 0.298
+  },
+  {
+   "start": 444.4,
+   "end": 449.4,
+   "text": "ん",
+   "avg_logprob": -0.993,
+   "no_speech_prob": 0.298
+  },
+  {
+   "start": 449.4,
+   "end": 455.4,
+   "text": "ん",
+   "avg_logprob": -0.993,
+   "no_speech_prob": 0.298
+  },
+  {
+   "start": 455.4,
+   "end": 459.4,
+   "text": "ん",
+   "avg_logprob": -0.993,
+   "no_speech_prob": 0.298
+  },
+  {
+   "start": 460.4,
+   "end": 466.4,
+   "text": "ん",
+   "avg_logprob": -0.549,
+   "no_speech_prob": 0.111
+  },
+  {
+   "start": 466.4,
+   "end": 469.4,
+   "text": "ん",
+   "avg_logprob": -0.549,
+   "no_speech_prob": 0.111
+  },
+  {
+   "start": 469.4,
+   "end": 471.4,
+   "text": "ん",
+   "avg_logprob": -0.549,
+   "no_speech_prob": 0.111
+  },
+  {
+   "start": 471.4,
+   "end": 474.4,
+   "text": "ん",
+   "avg_logprob": -0.549,
+   "no_speech_prob": 0.111
+  },
+  {
+   "start": 474.4,
+   "end": 478.4,
+   "text": "ん",
+   "avg_logprob": -0.549,
+   "no_speech_prob": 0.111
+  },
+  {
+   "start": 478.4,
+   "end": 481.4,
+   "text": "ん",
+   "avg_logprob": -0.549,
+   "no_speech_prob": 0.111
+  },
+  {
+   "start": 480.0,
+   "end": 483.9,
+   "text": "かけろ、みなみなかけろ",
+   "avg_logprob": -0.595,
+   "no_speech_prob": 0.295
+  },
+  {
+   "start": 483.9,
+   "end": 487.0,
+   "text": "空空かけろ、空空はしで",
+   "avg_logprob": -0.595,
+   "no_speech_prob": 0.295
+  },
+  {
+   "start": 487.0,
+   "end": 490.2,
+   "text": "みなかけろ",
+   "avg_logprob": -0.595,
+   "no_speech_prob": 0.295
+  },
+  {
+   "start": 510.0,
+   "end": 514.3,
+   "text": "故満開業",
+   "avg_logprob": -3.565,
+   "no_speech_prob": 0.585
+  },
+  {
+   "start": 514.3,
+   "end": 523.24,
+   "text": "クッターに飛行機に自然同じ",
+   "avg_logprob": -3.565,
+   "no_speech_prob": 0.585
+  },
+  {
+   "start": 523.24,
+   "end": 527.98,
+   "text": "駅行する",
+   "avg_logprob": -3.565,
+   "no_speech_prob": 0.585
+  },
+  {
+   "start": 527.98,
+   "end": 536.34,
+   "text": "インスゲーム",
+   "avg_logprob": -3.565,
+   "no_speech_prob": 0.585
+  },
+  {
+   "start": 536.34,
+   "end": 546.34,
+   "text": "JR東日本E233系電車",
+   "avg_logprob": -0.765,
+   "no_speech_prob": 0.824
+  },
+  {
+   "start": 566.34,
+   "end": 576.34,
+   "text": "JR東日本E233系電車",
+   "avg_logprob": -0.366,
+   "no_speech_prob": 0.597
+  },
+  {
+   "start": 596.34,
+   "end": 606.34,
+   "text": "JR東日本E233系電車",
+   "avg_logprob": -0.136,
+   "no_speech_prob": 0.665
+  }
+ ]
+}

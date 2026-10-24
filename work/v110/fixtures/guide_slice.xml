@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tv>
+  <channel id="6176f39e709f160007ec61c3">
+    <display-name>48 Hours</display-name>
+    <icon src="https://images.pluto.tv/channels/6176f39e709f160007ec61c3/colorLogoPNG.png"/>
+  </channel>
+<channel id="13-strt"><display-name>13th Street HD</display-name><display-name>13th Street</display-name><icon src="https://iptvx.one/picons/13-strt.png"/></channel>
+<channel id="unmapped-chan"><display-name>Not In The Map</display-name></channel>
+  <programme channel="6176f39e709f160007ec61c3" start="20261018185900 +0000" stop="20261018195900 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261018185900 +0000</episode-num>
+    <desc>Decades after 16-year-old Molly Bish vanished, her sister turns to TikTok for answers.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>Help Find Molly Bish's Killer</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261018195900 +0000" stop="20261018210000 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261018195900 +0000</episode-num>
+    <desc>"Survivor" contestant Joe Hunter says his sister, whose death was officially ruled a suicide, was murdered.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>Joe Hunter's Mission</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261018210000 +0000" stop="20261018215900 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261018210000 +0000</episode-num>
+    <desc>A gravely ill young woman is rushed to the hospital where doctors discover her body is full of lead, leading everyone to wonder who caused it.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>The Gaslighting of Hannah Pettey</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261018215900 +0000" stop="20261018230000 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261018215900 +0000</episode-num>
+    <desc>A woman dies after an alleged accidental shooting in her bedroom; eight years later, surveillance audio upends the case.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>Melissa Rocuba's Final Moments</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261018230000 +0000" stop="20261018235900 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261018230000 +0000</episode-num>
+    <desc>The daughter of a woman murdered more than 30 years ago worries she will lose her father when a new investigation ties him to the case.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>The Mother I Wish I Knew</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261018235900 +0000" stop="20261019010100 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261018235900 +0000</episode-num>
+    <desc>When Katlyn Lyon Montgomery dies in October 2022, her mother turns to TikTok to share her grief and demand justice, building an online community to help hold Katlyn's killer accountable.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>The Sneak Attack on Katlyn Lyon</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261019010100 +0000" stop="20261019020000 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261019010100 +0000</episode-num>
+    <desc>When a teenager shoots two of his friends, he claims the shooting was triggered by a reaction to a popular prescription acne medication that caused him to experience homicidal thoughts.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>The Rx Defense</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261019020000 +0000" stop="20261019025900 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261019020000 +0000</episode-num>
+    <desc>More than 50 years after a teenage girl is murdered in small-town Nebraska, the long-dormant case comes together to make an arrest.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>The Girl From Wahoo</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261019025900 +0000" stop="20261019040000 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261019025900 +0000</episode-num>
+    <desc>When a college student in Milwaukee vanishes after a first date, investigators race to retrace her final movements.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>Sade Robinson and the Secret Beach</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+  <programme channel="6176f39e709f160007ec61c3" start="20261019040000 +0000" stop="20261019045900 +0000">
+    <title>48 Hours</title>
+    <live/>
+    <episode-num system="original-air-date">20261019040000 +0000</episode-num>
+    <desc>When remains found in a swamp are identified, friends are stunned; Mindi Kassotis was supposed to have died in a hospital; five months later, police say she was murdered, and focus on her husband, Nick, to unravel how she died twice.</desc>
+    <icon src="https://images.pluto.tv/series/66bc9d029700930013ea1b5b/tile_1774260154980.jpg?fill=blur&amp;fit=fill&amp;fm=jpg&amp;h=900&amp;q=75&amp;w=900"/>
+    <date>19700101</date>
+    <series-id system="pluto">66bc9d029700930013ea1b5b</series-id>
+    <sub-title>The Woman Who Died Twice</sub-title>
+    <category>True Crime</category>
+    <category>Reality</category>
+    <category>Series</category>
+  </programme>
+<programme start="20261012001500 +0300" stop="20261012005500 +0300" channel="13-strt"><desc>Tödliches Musikbusiness: Der ungeklärte Fall eines Chorsängers der U.S. Navy führt Michelle Mackey und Jim. Australia, Vereinigte Staaten von Amerika. 2025. Krimiserie</desc><title>NCIS: Sydney 2 – Atemlos | E07</title></programme>
+<programme start="20261012005500 +0300" stop="20261012014000 +0300" channel="13-strt"><desc>Ein rätselhafter Mordfall: Der Tod eines ausgebluteten Seemanns stößt Ermittlungen in einer Welt moderner Vampire, verfeindeter Familien und exzessiven Wodkakonsums an. Australia, Vereinigte Staaten von Amerika. 2025. Krimiserie</desc><title>NCIS: Sydney 2 – Blut ist dicker als Wodka | E08</title></programme>
+<programme start="20261012014000 +0300" stop="20261012022000 +0300" channel="13-strt"><desc>Bei glühender Hitze ermittelt das Team den Tod eines US-Marine-Gefreiten. Der Soldat kam bei einer gemeinsamen Trainingsübung von US und australischen Truppen ums Leben. Australia, Vereinigte Staaten von Amerika. 2025. Krimiserie</desc><title>NCIS: Sydney 2 – Mango Madness | E09</title></programme>
+<programme start="20261012022000 +0300" stop="20261012030500 +0300" channel="13-strt"><desc>Remy und sein Team stehen unter Druck: Am Vorabend einer Gedenkfeier zum Zweiten Weltkrieg gilt es, eine vermisste Rakete aufzuspüren – bevor die Veranstaltung in Gefahr gerät. Australia, Vereinigte Staaten von Amerika. 2025. Krimiserie</desc><title>NCIS: Sydney 2 – Krokodile | E10</title></programme>
+<programme start="20261012030500 +0300" stop="20261012034500 +0300" channel="13-strt"><desc>Als ein ungarischer Polizist ein Paar ermordet, unterstützt das Team die lokalen Behörden. Special Agent Kellett geht der Fall unter die Haut, denn ihr Freund scheint darin verwickelt zu sein. Vereinigte Staaten von Amerika. 2023. Krimiserie</desc><title>FBI: International 2 – Vertrauen | E15</title></programme>
+<programme start="20261012034500 +0300" stop="20261012042500 +0300" channel="13-strt"><desc>Hängt die Entführung eines US-Architekten in Rom mit einem geplanten terroristischen Attentat in New York zusammen? Während der Ermittlung, wird die schwangere Agentin Chase verletzt. Vereinigte Staaten von Amerika. 2023. Krimiserie</desc><title>FBI: International 2 – Unmittelbare Bedrohung – Erster Teil | E16</title></programme>
+<programme start="20261012042500 +0300" stop="20261012050500 +0300" channel="13-strt"><desc>Das Team fliegt nach Wien, da dort eine US-amerikanische Primaballerina Opfer eines Säureangriffs wurde. Ihre Kollegen sowie ihr Freund stehen unter Verdacht. Vereinigte Staaten von Amerika. 2023. Krimiserie</desc><title>FBI: International 2 – Eifersüchtige Geliebte | E17</title></programme>
+<programme start="20261012050500 +0300" stop="20261012055000 +0300" channel="13-strt"><desc>Special Agent Forrester wird verfolgt. Der russische Attentäter Pavlovic will sich für den Tod seines Bruders an dem Agenten rächen. In Budapest nimmt das Team seine Spur auf. Vereinigte Staaten von Amerika. 2023. Krimiserie</desc><title>FBI: International 2 – Blutfehde | E18</title></programme>
+<programme start="20261012055000 +0300" stop="20261012063000 +0300" channel="13-strt"><desc>Nachdem in Stockholm ein amerikanischer Tourist getötet wird, fliegt das Team nach Schweden, um zu ermitteln. Handelt es sich um ein Hassverbrechen einer politischen Gruppierung? Vereinigte Staaten von Amerika. 2023. Krimiserie</desc><title>FBI: International 2 – Todessprint | E19</title></programme>
+<programme start="20261012063000 +0300" stop="20261012065000 +0300" channel="13-strt"><desc>Ein Banküberfall, eine Entführung und ein tödlicher Autounfall – drei Aktionen, die mehr gemeinsam haben, als es anfangs scheint. Nachdem Pauls Frau sich selbst entführen lässt, um mit ihrem vermeintlichen Entführer und den geforderten zwei Millionen Euro Lösegeld durchzubrennen, verursacht Paul einen tödlichen Autounfall. Die Polizei hat er schnell vom Hals, doch im Waldstück an der Unfallstelle häufen sich die Leichen und die Indizien, dass seine Frau ein falsches Spiel mit ihm treibt. Deutschland. 2017. Thriller</desc><title>Los Paul! | E07</title></programme>
+<programme start="20261019010000 +0000" stop="20261019020000 +0000" channel="unmapped-chan"><title>Should Be Dropped</title></programme>
+</tv>

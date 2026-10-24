@@ -30,6 +30,7 @@ javac -nowarn -encoding UTF-8 -source 17 -target 17 \
 set +e
 LD_LIBRARY_PATH="$ROOT/ci/ortnative" java \
     -Djava.library.path="$ROOT/ci/ortnative" \
+    -Dsandy.ci=true \
     -Dsandy.classes="$V180/appclasses" \
     -cp "$V180/testclasses:$V180/appclasses:$ROOT/ci/testdeps/json-20240303.jar:$ROOT/ci/testdeps/ort-desktop.jar:$DEPS$PLAIN$PLATFORM" \
     V180Test 2>&1 | tee "$OUT/v180test.log"
@@ -37,6 +38,8 @@ rc=${PIPESTATUS[0]}
 set -e
 echo "harness exit code: $rc"
 grep -E "V180Test: [0-9]+ checks, [0-9]+ failures" "$OUT/v180test.log" || true
+echo "--- CI skips (groups whose binary packs / bulky fixtures do not travel; see ci/HARNESS-CI-AUDIT.md) ---"
+grep -E "^(SKIP |CI SKIPS:)" "$OUT/v180test.log" || true
 if [ "$rc" -ne 0 ]; then echo "HARNESS FAILED (exit $rc)"; exit 1; fi
 if ! grep -qE "V180Test: [0-9]+ checks, 0 failures" "$OUT/v180test.log"; then
   echo "HARNESS FAILED (failures present or summary missing)"

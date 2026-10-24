@@ -182,6 +182,40 @@ public class V180Test {
         }
     }
 
+    // ------------------------------------------------------------ CI mode
+    //
+    // GitHub Actions runs this same harness with -Dsandy.ci=true.
+    // The heavy binary packs (the engine pack, the diarization
+    // pack, the 52 voice packs) and a few bulky fixtures
+    // deliberately do NOT travel with the repo. In CI mode ONLY, a
+    // group whose external fixture is absent prints a loud named
+    // SKIP and returns — no crash, and absence is never recorded
+    // as a failure — and main prints the tally as
+    // "CI SKIPS: n group(s): names" next to the summary.
+    // Without the property the harness is exactly as strict as it
+    // has always been: a missing pack still crashes/fails, by
+    // design. See ci/HARNESS-CI-AUDIT.md for the fixture census.
+    static final boolean CI = Boolean.getBoolean("sandy.ci");
+    static final List<String> CI_SKIPS = new ArrayList<>();
+
+    /** CI only: if any of the given files is absent, record a
+     *  named skip for the group and return true (caller returns).
+     *  Always false when the sandy.ci property is absent. */
+    static boolean ciSkipIfMissing(String group, File... files) {
+        if (!CI) return false;
+        StringBuilder missing = new StringBuilder();
+        for (File f : files) {
+            if (!f.exists()) {
+                if (missing.length() > 0) missing.append(", ");
+                missing.append(f.getPath());
+            }
+        }
+        if (missing.length() == 0) return false;
+        if (!CI_SKIPS.contains(group)) CI_SKIPS.add(group);
+        System.out.println("SKIP " + group + ": missing " + missing);
+        return true;
+    }
+
     // ------------------------------------------------------------ v0.15.0 two doors
 
     static VoiceLangs.Row vrow(String tv, String pack, String iso) {
@@ -638,6 +672,11 @@ public class V180Test {
         commonsSuite();
         nfajSuite();
 
+        if (CI) {
+            System.out.println("CI SKIPS: " + CI_SKIPS.size() + " group(s): "
+                    + (CI_SKIPS.isEmpty() ? "(none)"
+                            : String.join(", ", CI_SKIPS)));
+        }
         System.out.println("V180Test: " + checks + " checks, "
                 + failures + " failures");
         System.exit(failures == 0 ? 0 : 1);
@@ -1198,6 +1237,10 @@ public class V180Test {
     // ------------------------------------------------------------ packs
 
     static void packChecks(String yourFiles, String v061) throws Exception {
+        if (ciSkipIfMissing("pack",
+                new File(yourFiles, "sandy-engine-ja-en-onnx.pack"),
+                new File(v061, "out/packs/bad-sha.pack"),
+                new File(v061, "out/packs/missing-file.pack"))) return;
         File tmp = new File(v061, "build/test-extract");
         deleteRec(tmp);
         EnginePack.Result r;
@@ -1242,6 +1285,8 @@ public class V180Test {
     // ------------------------------------------------------------ guard
 
     static void guardRegression(String bench) throws Exception {
+        if (ciSkipIfMissing("guard",
+                new File(bench, "asr_base_vad0.json"))) return;
         String json = new String(Files.readAllBytes(
                 new File(bench, "asr_base_vad0.json").toPath()), "UTF-8");
         org.json.JSONObject root = new org.json.JSONObject(json);
@@ -1296,6 +1341,11 @@ public class V180Test {
     // ------------------------------------------------------------ e2e
 
     static void e2eRecords(String v061) throws Exception {
+        if (ciSkipIfMissing("e2e",
+                new File(v061, "out/e2e_slice.tr-en.json"),
+                new File(v061, "out/e2e_slice.tr-en.srt"),
+                new File(v061, "out/e2e_toshishun.tr-en.json"),
+                new File(v061, "out/e2e_toshishun.tr-en.srt"))) return;
         for (String name : new String[]{"e2e_slice", "e2e_toshishun"}) {
             File json = new File(v061, "out/" + name + ".tr-en.json");
             File srt = new File(v061, "out/" + name + ".tr-en.srt");
@@ -2398,6 +2448,8 @@ public class V180Test {
         // --- the real index: a captured TVmaze page (page 200)
         String fixDir = System.getProperty("user.home")
                 + "/workspace/tala-tv-2026-10-16/work/v100/fixtures";
+        if (ciSkipIfMissing("catalogIndex",
+                new File(fixDir, "shows_page200.json"))) return;
         String pageJson = new String(Files.readAllBytes(
                 new File(fixDir, "shows_page200.json").toPath()), "UTF-8");
         List<TvMaze.Show> page = TvMaze.parseShows(pageJson);
@@ -2424,6 +2476,9 @@ public class V180Test {
     static void titleNames() throws Exception {
         String fixDir = System.getProperty("user.home")
                 + "/workspace/tala-tv-2026-10-16/work/v100/fixtures";
+        if (ciSkipIfMissing("titleNames",
+                new File(fixDir, "akas_27436.json"),
+                new File(fixDir, "akas_919.json"))) return;
         String akaJson = new String(Files.readAllBytes(
                 new File(fixDir, "akas_27436.json").toPath()), "UTF-8");
         List<TvMaze.Aka> akas = TvMaze.parseAkas(akaJson);
@@ -2606,6 +2661,11 @@ public class V180Test {
         // --- the wall, over the REAL captured Persian records
         String fixDir = System.getProperty("user.home")
                 + "/workspace/tala-tv-2026-10-16/work/v101/fixtures";
+        if (ciSkipIfMissing("farsi",
+                new File(fixDir, "shows_persian.json"),
+                new File(System.getProperty("user.home")
+                        + "/workspace/tala-tv-2026-10-16"
+                        + "/work/v101/research_persian.json"))) return;
         String faJson = new String(Files.readAllBytes(
                 new File(fixDir, "shows_persian.json").toPath()), "UTF-8");
         List<TvMaze.Show> faShows = TvMaze.parseShows(faJson);
@@ -2790,6 +2850,9 @@ public class V180Test {
         String home = System.getProperty("user.home");
         File fix = new File(home + "/workspace/tala-tv-2026-10-16/work/v110"
                 + "/fixtures/guide_slice.xml");
+        if (ciSkipIfMissing("xmltv", fix,
+                new File(home + "/workspace/tala-tv-2026-10-16/work/v110"
+                        + "/fixtures/guide_bridge.txt"))) return;
         java.util.Map<String, String> bridge = new java.util.HashMap<>();
         for (String line : new String(Files.readAllBytes(new File(home
                 + "/workspace/tala-tv-2026-10-16/work/v110/fixtures/"
@@ -3197,6 +3260,9 @@ public class V180Test {
 
     static void facetSuite() throws Exception {
         String home = System.getProperty("user.home");
+        if (ciSkipIfMissing("facets", new File(home
+                + "/workspace/tala-tv-2026-10-16/work/v100/fixtures/"
+                + "shows_page200.json"))) return;
         String page = new String(Files.readAllBytes(new File(home
                 + "/workspace/tala-tv-2026-10-16/work/v100/fixtures/"
                 + "shows_page200.json").toPath()), "UTF-8");
@@ -3406,6 +3472,9 @@ public class V180Test {
 
         // the real page, A-Z: monotone, and the jump lands right
         String home = System.getProperty("user.home");
+        if (ciSkipIfMissing("sorts", new File(home
+                + "/workspace/tala-tv-2026-10-16/work/v100/fixtures/"
+                + "shows_page200.json"))) return;
         String page = new String(Files.readAllBytes(new File(home
                 + "/workspace/tala-tv-2026-10-16/work/v100/fixtures/"
                 + "shows_page200.json").toPath()), "UTF-8");
@@ -3432,6 +3501,9 @@ public class V180Test {
     static void peopleSuite() throws Exception {
         String home = System.getProperty("user.home");
         String fix = home + "/workspace/tala-tv-2026-10-16/work/v111/fixtures/";
+        if (ciSkipIfMissing("people",
+                new File(fix, "people_search_cranston.json"),
+                new File(fix, "castcredits_14245.json"))) return;
         String pj = new String(Files.readAllBytes(
                 new File(fix, "people_search_cranston.json").toPath()), "UTF-8");
         java.util.List<TvMaze.Person> people = TvMaze.parsePeople(pj);
@@ -3520,6 +3592,9 @@ public class V180Test {
         }
         // liveness: the generation record proves every file in the
         // shipped map answered HEAD 200, and Flash answered 404
+        if (ciSkipIfMissing("guideMap", new File(home
+                + "/workspace/tala-tv-2026-10-16/work/v111/data/"
+                + "guide_map_measured_111.json"))) return;
         org.json.JSONObject measured = new org.json.JSONObject(
                 new String(Files.readAllBytes(new File(home
                         + "/workspace/tala-tv-2026-10-16/work/v111/data/"
@@ -3771,6 +3846,7 @@ public class V180Test {
      *  refuses tampering — DiarPack's fail-closed law. */
     static void diarPackSuite(String yourFiles) throws Exception {
         File pack = new File(yourFiles, "sandy-diarize.pack");
+        if (ciSkipIfMissing("diarpack", pack)) return;
         check("diarpack: the shipped pack exists", pack.isFile());
         if (!pack.isFile()) return;
         DiarPack.Result r;
@@ -3818,6 +3894,10 @@ public class V180Test {
                 + "/workspace/tala-tv-2026-10-16/work/v120/diar");
         File pack = new File(yourFiles, "sandy-diarize.pack");
         File fixture = new File(diarDir, "fixture.wav");
+        if (ciSkipIfMissing("e2e diar", pack, fixture,
+                new File(diarDir, "fixture_truth.json"),
+                new File(diarDir, "ref_embeddings.bin"),
+                new File(diarDir, "toshi60.wav"))) return;
         check("e2e diar: fixture present", fixture.isFile() && pack.isFile());
         if (!fixture.isFile() || !pack.isFile()) return;
 
@@ -4037,6 +4117,8 @@ public class V180Test {
                 + plutoBridged + ")", plutoBridged >= 400);
 
         // The REAL built-in channel cache (12,883 channels).
+        if (ciSkipIfMissing("liveGroups", new File(home
+                + "/workspace/tala-tv-2026-10-16/work/v020/index.country.m3u"))) return;
         String m3u = new String(Files.readAllBytes(new File(home
                 + "/workspace/tala-tv-2026-10-16/work/v020/index.country.m3u")
                 .toPath()), "UTF-8");
@@ -4061,6 +4143,8 @@ public class V180Test {
         check("livegroups: service tiles cover a real share (" + svcTotal + ")",
                 svcTotal >= 800);
 
+        if (ciSkipIfMissing("liveGroups", new File(home
+                + "/workspace/tala-tv-2026-10-16/app/assets/channels_map.tsv"))) return;
         String mapText = new String(Files.readAllBytes(new File(home
                 + "/workspace/tala-tv-2026-10-16/app/assets/channels_map.tsv")
                 .toPath()), "UTF-8");
@@ -4364,6 +4448,13 @@ public class V180Test {
         File dir = new File(yourFiles);
         File[] packs = dir.listFiles((d, n) -> n.startsWith("sandy-voice-")
                 && n.endsWith(".pack"));
+        if (CI && (packs == null || packs.length == 0)) {
+            if (!CI_SKIPS.contains("voicepack")) CI_SKIPS.add("voicepack");
+            System.out.println("SKIP voicepack: no sandy-voice-*.pack on the"
+                    + " shelf at " + dir.getPath()
+                    + " (binary packs do not travel to CI)");
+            return;
+        }
         check("voicepack: packs are on the shelf", packs != null);
         if (packs == null) return;
         checkEq("voicepack: one pack per native language", 52, packs.length);
@@ -4417,6 +4508,9 @@ public class V180Test {
     static void voiceFrontendSuite() throws Exception {
         String fix = System.getProperty("user.home")
                 + "/workspace/tala-tv-2026-10-16/work/v130/fixtures";
+        if (ciSkipIfMissing("voiceFrontend",
+                new File(fix, "tokens-eng.txt"),
+                new File(fix, "tokens-rus.txt"))) return;
         java.util.Map<String, Integer> eng =
                 OnnxVoiceSynth.loadTokens(new File(fix, "tokens-eng.txt"));
         List<long[]> hello = OnnxVoiceSynth.tokenize(eng, "Hello world.");
