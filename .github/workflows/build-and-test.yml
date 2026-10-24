@@ -8,7 +8,6 @@ name: build-and-test
 on:
   push:
     branches: [main]
-    
     # The linkcheck bot commits to ci/linkcheck/ every 2h on its own
     # schedule — those freshness updates must not burn a full APK
     # build + emulator launch each time.
