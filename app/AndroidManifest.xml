@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.talacore.talatv"
+    android:versionCode="24"
+    android:versionName="0.18.0">
+
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- v0.7.0: screen-share — the phone's Wi-Fi address, so the
+         watching page can be offered on the home network. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- v0.5.0: rumble cues (playback start / verification complete). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- v0.8.0: the book reader is a foreground service — it keeps
+         reading with the screen off (the recliner rule), holds a
+         wake lock only while speaking, and posts its controls. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- v0.14.0: the story room's family voices and journals are
+         recorded on the phone's own microphone, at the family's
+         hand, and kept as files on the memory hook. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- v0.14.0: the story room's family voices and journals are
+         recorded on the phone's own microphone, at the family's
+         hand, and kept as files on the memory hook. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- v0.11.0: the VCR timer — re-arm the filed queue after a
+         reboot (alarms die with the phone; the queue file doesn't),
+         ask for the battery-optimization exemption so a timer can
+         record while the phone sleeps, and hold the exact-alarm
+         permission for the fallback arming path (the primary path
+         is the alarm-clock API, which needs none). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- My Library reads the phone's video index. READ_MEDIA_VIDEO is
+         the Android 13+ form; READ_EXTERNAL_STORAGE covers older phones. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- usesCleartextTraffic: many public free-to-air streams are plain
+         http://. A TV guide has to be able to reach them; noted in NOTES. -->
+    <!-- v0.4.0: the app is SANDY — named for James's mother, its audience.
+         The label is the home-screen name; the package stays
+         com.talacore.talatv (invisible plumbing) so installs ride over
+         0.1–0.3 and every saved favorite/playlist/verdict carries. -->
+    <!-- v0.16.1: THE INSTALLER'S FACE — installers and file managers
+         read the APPLICATION icon before install, and many cannot
+         draw an adaptive icon at that stage (they fall back to a
+         generic picture). So the application wears a plain PNG
+         (@drawable/ic_installer, the Sandy picture, 512x512), which
+         every installer can draw; the adaptive icon moves onto the
+         launcher activity below, where home screens read it.
+         Diagnosis by Claude, relayed by James 2026-10-19. -->
+    <application
+        android:label="Sandy"
+        android:icon="@drawable/ic_installer"
+        android:roundIcon="@drawable/ic_installer"
+        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:usesCleartextTraffic="true"
+        android:hardwareAccelerated="true"
+        android:allowBackup="false">
+
+        <!-- v0.4.0: the boot screen is the front door — the picture,
+             brief warm-up, then home. -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:theme="@style/SplashTheme"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:label="Sandy">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".HomeActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:label="Live TV" />
+
+        <activity
+            android:name=".ShowActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".SourcesActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".VodActivity"
+            android:exported="false"
+            android:label="Movies &amp; VOD" />
+
+        <activity
+            android:name=".PlayerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="sensorLandscape" />
+
+        <activity
+            android:name=".PlaylistsActivity"
+            android:exported="false"
+            android:label="Playlists" />
+
+        <activity
+            android:name=".LibraryActivity"
+            android:exported="false"
+            android:label="My Library" />
+
+        <!-- v0.9.0: My Videos — the local player's shelf: every
+             video on the phone, tappable, played by the one player. -->
+        <activity
+            android:name=".FilesActivity"
+            android:exported="false"
+            android:label="My Videos" />
+
+        <!-- v0.10.0: the language wall's full shelf list + the country door -->
+        <activity
+            android:name=".WallListActivity"
+            android:exported="false"
+            android:label="Shelf" />
+
+        <activity
+            android:name=".CountryIndexActivity"
+            android:exported="false"
+            android:label="Countries" />
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="Settings" />
+
+        <!-- v0.5.0: first-run language pick + Settings re-pick. -->
+        <activity
+            android:name=".LanguageActivity"
+            android:exported="false"
+            android:label="Language" />
+
+        <!-- v0.5.0: the Recordings shelf (door inside My Library). -->
+        <activity
+            android:name=".RecordingsActivity"
+            android:exported="false"
+            android:label="Recordings" />
+
+        <!-- v0.6.0: the voice book — per-show casting for voiced dubs. -->
+        <activity
+            android:name=".VoiceBookActivity"
+            android:exported="false"
+            android:label="Voice Book" />
+
+        <!-- v0.8.0: the book shelf + reader screen (door inside
+             My Library). -->
+        <activity
+            android:name=".BooksActivity"
+            android:exported="false"
+            android:label="Books" />
+
+        <activity
+            android:name=".ReaderActivity"
+            android:exported="false"
+            android:label="Read to Me" />
+
+        <!-- v0.15.0: THE TWO DOORS — Speak For Me (a voice for a
+             person who cannot speak), Listen For Me (the ears:
+             speech as big text, kept sound + words), and the
+             Translator (turn-based conversation between two
+             languages, heard + rendered side by side). -->
+        <activity
+            android:name=".SpeakActivity"
+            android:exported="false"
+            android:label="Speak For Me" />
+        <activity android:name=".BookSearchActivity" android:exported="false" />
+        <activity android:name=".ArchiveFilmsActivity" android:exported="false" />
+        <activity android:name=".ReaderRoomActivity" android:exported="false" />
+        <activity
+            android:name=".ListenActivity"
+            android:exported="false"
+            android:label="Listen For Me" />
+        <activity
+            android:name=".TranslatorActivity"
+            android:exported="false"
+            android:label="Translator" />
+
+        <!-- v0.14.0: Story Mode — the story room, its shelf, its
+             telling, the children's own making and playing,
+             family voices, journals, and the grown-up gate that
+             guards the room's exits. -->
+        <activity
+            android:name=".StoryActivity"
+            android:exported="false"
+            android:label="Stories" />
+        <activity
+            android:name=".StoryShelfActivity"
+            android:exported="false"
+            android:label="Story shelf" />
+        <activity
+            android:name=".StoryTellActivity"
+            android:exported="false"
+            android:label="Story time" />
+        <activity
+            android:name=".StoryMakeActivity"
+            android:exported="false"
+            android:label="Make a story" />
+        <activity
+            android:name=".StoryPlayActivity"
+            android:exported="false"
+            android:label="My stories" />
+        <activity
+            android:name=".StoryRecordActivity"
+            android:exported="false"
+            android:label="Family voices" />
+        <activity
+            android:name=".JournalsActivity"
+            android:exported="false"
+            android:label="Voice journals" />
+        <activity
+            android:name=".GrownUpGateActivity"
+            android:exported="false"
+            android:label="Grown-ups" />
+
+        <!-- v0.14.0: a story cartridge leaves the phone only as a
+             file, hand to hand through the share sheet, behind
+             the grown-up gate. This serves the story room's
+             files and share zips; nothing else is reachable. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.talacore.talatv.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- v0.12.0: the dub kitchen — pick an episode, cook its
+             dub on-device (subtitles first, translate-then-speak,
+             cast voices), and the dubbed-episodes shelf. -->
+        <activity
+            android:name=".DubActivity"
+            android:exported="false"
+            android:label="Dub an episode" />
+
+        <!-- v0.13.0: the voice coverage page — every catalogue
+             language with this phone's voice state for it. -->
+        <activity
+            android:name=".VoiceCoverageActivity"
+            android:exported="false"
+            android:label="Voice coverage" />
+
+        <!-- v0.13.0: sources & credit — the front doors of the
+             houses Sandy pulls from, plus the responsibility
+             line. -->
+        <activity
+            android:name=".CreditActivity"
+            android:exported="false"
+            android:label="Sources and credit" />
+
+        <!-- v0.8.0: the reading voice — foreground service,
+             media-playback type, so a book survives the pocket. -->
+        <service
+            android:name=".ReaderService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- v0.11.0: every language the catalogue can show. -->
+        <activity
+            android:name=".LanguageIndexActivity"
+            android:exported="false"
+            android:label="Languages" />
+
+        <!-- v0.11.0: the TV Guide + the VCR timer book. -->
+        <activity
+            android:name=".GuideActivity"
+            android:exported="false"
+            android:label="TV Guide" />
+
+        <activity
+            android:name=".TimersActivity"
+            android:exported="false"
+            android:label="Timers" />
+        <!-- v0.12.1: set a timer — one screen, the whole frame
+             (day + start + end) visible before commit. -->
+        <activity
+            android:name=".SetTimerActivity"
+            android:exported="false"
+            android:label="Set a timer" />
+
+        <!-- v0.11.0: the VCR itself — a foreground recording service
+             (media-playback type, like the reader) so a timer
+             recording survives the app closing. -->
+        <service
+            android:name=".TimerRecordService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- v0.11.0: the timer doorbell — our own TIMER_FIRE alarms
+             plus BOOT_COMPLETED for re-arming the filed queue. -->
+        <receiver
+            android:name=".TimerReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.talacore.talatv.TIMER_FIRE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

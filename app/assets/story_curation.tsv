@@ -1,0 +1,24 @@
+# Sandy's curated children's shelf (v0.14.0) — curated going IN,
+# not filtered after. Every row was placed here deliberately:
+# public-domain tales and the Internet Archive's children's
+# collections, through the Archive's own front door. Columns:
+# id, title, author, language (iso1), tale group (same tale,
+# another tongue), archive id (may be empty), search terms,
+# cast (the narrator first), illustrated (1 = the edition is
+# known to carry its own pictures).
+# This file seeds files/memory/story/curation.tsv on first run;
+# the file on the memory hook is the living list.
+aesop-en	Aesop's Fables	Aesop	en	aesop	aesopsfables00aeso	Aesop Fables Milo Winter	Narrator,Fox,Crow,Hare,Tortoise,Lion,Mouse,Wolf,Crane,Goat,Boy	1
+aesop-es	Fábulas de Esopo	Esopo	es	aesop		Fábulas de Esopo	Narrador,Zorro,Cuervo,Liebre,Tortuga,León,Ratón,Lobo	0
+grimm-en	Grimm's Fairy Tales	Brothers Grimm	en	grimm	grimmsfairytales00grim	Grimm Fairy Tales household tales	Narrator,Mother,Father,King,Witch,Wolf,Girl,Boy,Queen	1
+grimm-es	Cuentos de los hermanos Grimm	Hermanos Grimm	es	grimm		Cuentos hermanos Grimm	Narrador,Madre,Padre,Rey,Bruja,Lobo,Niña,Niño	0
+grimm-de	Grimms Märchen	Brüder Grimm	de	grimm		Kinder- und Hausmärchen Grimm	Erzähler,Mutter,Vater,König,Hexe,Wolf,Mädchen,Junge	0
+grimm-fr	Contes de Grimm	Frères Grimm	fr	grimm		Contes de Grimm	Narrateur,Mère,Père,Roi,Sorcière,Loup,Fille,Garçon	0
+andersen-en	Hans Andersen's Fairy Tales	Hans Christian Andersen	en	andersen		Hans Andersen Fairy Tales	Narrator,Mother,Girl,Boy,King,Queen,Duckling,Swan	1
+andersen-es	Cuentos de Andersen	Hans Christian Andersen	es	andersen		Cuentos de Andersen	Narrador,Madre,Niña,Niño,Rey,Patito	0
+andersen-de	Andersens Märchen	Hans Christian Andersen	de	andersen		Andersens Märchen	Erzähler,Mutter,Mädchen,Junge,König,Entlein	0
+alice-en	Alice's Adventures in Wonderland	Lewis Carroll	en	alice	alicesadventures00carr	Alice Adventures Wonderland Carroll	Narrator,Alice,Rabbit,Cat,Queen,Hatter,Mouse,Caterpillar	1
+peter-rabbit-en	The Tale of Peter Rabbit	Beatrix Potter	en	peter-rabbit	taleofpeterrab00pott	Tale of Peter Rabbit Potter	Narrator,Peter,Mother,McGregor	1
+velveteen-en	The Velveteen Rabbit	Margery Williams	en	velveteen	velveteenrabbit00bian	Velveteen Rabbit Margery Williams	Narrator,Rabbit,Boy,Horse,Nana,Fairy	1
+lafontaine-fr	Fables de La Fontaine	Jean de La Fontaine	fr	lafontaine		Fables de La Fontaine	Narrateur,Renard,Corbeau,Loup,Agneau,Tortue,Lièvre	0
+aesop-de	Äsops Fabeln	Äsop	de	aesop		Äsop Fabeln	Erzähler,Fuchs,Krähe,Hase,Schildkröte,Löwe,Maus,Wolf	0

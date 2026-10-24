@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Boot screen theme: the picture IS the window background, so the
+         first frame Android draws is already the boot screen (no white
+         flash). Navy matches the art's own background (#051226). -->
+    <style name="SplashTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_bg</item>
+        <item name="android:statusBarColor">#051226</item>
+        <item name="android:navigationBarColor">#051226</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

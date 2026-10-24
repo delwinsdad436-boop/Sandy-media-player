@@ -1,0 +1,91 @@
+# Sandy language registry seed - distilled from the full TVmaze index walk
+# measured live 2026-10-18 (work/v100/research_tvmaze.json): 90,574 shows,
+# 381 pages. Columns: TVmaze language name <TAB> shows in the full index.
+# 84 entries: 83 languages TVmaze names, plus its own "(none listed)"
+# bucket for the 2,813 shows with no language. The registry is NOT
+# baked into code: this seed only carries the last measured counts;
+# on the phone the walk refreshes them (LangRegistry).
+English	45122
+Russian	6508
+Japanese	6253
+Chinese	5936
+Korean	3611
+(none listed)	2813
+French	2671
+Spanish	2255
+Dutch	2181
+Thai	1527
+Norwegian	1506
+German	1355
+Swedish	1100
+Turkish	916
+Portuguese	898
+Hindi	820
+Italian	509
+Ukrainian	454
+Polish	432
+Arabic	422
+Danish	402
+Hungarian	352
+Tagalog	286
+Finnish	265
+Czech	233
+Hebrew	194
+Greek	176
+Welsh	149
+Irish	135
+Bengali	72
+Urdu	67
+Serbian	58
+Romanian	57
+Scottish Gaelic	56
+Vietnamese	56
+Armenian	54
+Icelandic	51
+Tamil	51
+Slovak	49
+Catalan	42
+Indonesian	40
+Croatian	39
+Marathi	35
+Telugu	35
+Malayalam	33
+Bulgarian	30
+Estonian	30
+Afrikaans	25
+Kazakh	24
+Persian	22
+Malay	21
+Uzbek	18
+Latvian	14
+Slovenian	11
+Lithuanian	10
+Georgian	9
+Javanese	9
+Kannada	8
+Azerbaijani	7
+Galician	7
+Panjabi	6
+Basque	6
+Belarusian	4
+Mongolian	4
+Zulu	4
+Burmese	4
+Divehi	3
+Bosnian	3
+Kyrgyz	2
+Malagasy	2
+Yoruba	2
+Albanian	1
+Pashto	1
+Kongo	1
+Wolof	1
+Latin	1
+Luxembourgish	1
+Chechen	1
+Sinhalese	1
+Gujarati	1
+Swahili	1
+Fijian	1
+Lao	1
+Central Khmer	1

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the FileProvider may hand out (v0.14.0): the story
+     room's memory files (cartridges travel as zips built in the
+     cache) and nothing else. -->
+<paths>
+    <files-path name="story" path="memory/story/" />
+    <cache-path name="share" path="." />
+</paths>

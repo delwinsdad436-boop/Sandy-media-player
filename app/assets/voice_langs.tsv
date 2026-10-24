@@ -1,0 +1,86 @@
+# Sandy voice language table - GENERATED from work/v130/coverage_table.tsv (measured 2026-10-18).
+# tvname <TAB> pack_code (MMS iso3, empty = no pack exists) <TAB> iso1 <TAB> kind: native|uroman|none
+English	eng	en	native
+Russian	rus	ru	native
+Japanese		ja	none
+Chinese		zh	none
+Korean		ko	uroman
+French	fra	fr	native
+Spanish	spa	es	native
+Dutch	nld	nl	native
+Thai	tha	th	native
+Norwegian		no	none
+German	deu	de	native
+Swedish	swe	sv	native
+Turkish	tur	tr	native
+Portuguese	por	pt	native
+Hindi	hin	hi	native
+Italian		it	none
+Ukrainian	ukr	uk	native
+Polish	pol	pl	native
+Arabic	ara	ar	native
+Danish		da	none
+Hungarian	hun	hu	native
+Tagalog	tgl	tl	native
+Finnish	fin	fi	native
+Czech		cs	none
+Hebrew	heb	he	native
+Greek	ell	el	native
+Welsh	cym	cy	native
+Irish		ga	none
+Bengali	ben	bn	native
+Urdu		ur	none
+Serbian		sr	none
+Romanian	ron	ro	native
+Scottish Gaelic		gd	none
+Vietnamese	vie	vi	native
+Armenian		hy	none
+Icelandic	isl	is	native
+Tamil	tam	ta	native
+Slovak		sk	none
+Catalan	cat	ca	native
+Indonesian	ind	id	native
+Croatian		hr	none
+Marathi	mar	mr	native
+Telugu	tel	te	native
+Malayalam	mal	ml	native
+Bulgarian	bul	bg	native
+Estonian		et	none
+Afrikaans		af	none
+Kazakh	kaz	kk	native
+Persian	fas	fa	native
+Malay		ms	none
+Uzbek		uz	none
+Latvian	lav	lv	native
+Slovenian		sl	none
+Lithuanian		lt	none
+Georgian		ka	none
+Javanese	jav	jv	native
+Kannada	kan	kn	native
+Azerbaijani		az	none
+Galician		gl	none
+Panjabi	pan	pa	native
+Basque	eus	eu	native
+Belarusian		be	none
+Mongolian	mon	mn	native
+Zulu		zu	none
+Burmese	mya	my	native
+Divehi	div	dv	native
+Bosnian		bs	none
+Kyrgyz	kir	ky	native
+Malagasy	mlg	mg	native
+Yoruba	yor	yo	native
+Albanian	sqi	sq	native
+Pashto		ps	none
+Kongo		kg	none
+Wolof		wo	none
+Latin	lat	la	native
+Luxembourgish		lb	none
+Chechen	che	ce	native
+Sinhalese		si	none
+Gujarati	guj	gu	native
+Swahili	swh	sw	native
+Fijian	fij	fj	native
+Lao	lao	lo	native
+Central Khmer	khm	km	native
+(none listed)			-

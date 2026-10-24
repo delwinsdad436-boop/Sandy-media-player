@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The art's own navy — adaptive-icon background so the foreground
+         art's margins blend seamlessly at any mask shape. -->
+    <color name="ic_launcher_bg">#051226</color>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Story Mode panel (v0.14.0): a flat picture card, drawn once,
+     bundled with Sandy. A storyboard, not a movie. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="240dp"
+    android:viewportWidth="240" android:viewportHeight="240">
+    <path android:fillColor="#1d2440" android:pathData="M0,0 h240 v240 h-240 Z"/>
+    <path android:fillColor="#ffd94d" android:pathData="M120,44 L138,94 L192,96 L150,128 L164,182 L120,152 L76,182 L90,128 L48,96 L102,94 Z"/>
+    <path android:fillColor="#8a6d1f" android:pathData="M103,112 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 Z"/>
+    <path android:fillColor="#8a6d1f" android:pathData="M127,112 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 Z"/>
+    <path android:fillColor="#8a6d1f" android:pathData="M106,132 Q120,142 134,132"/>
+    <path android:fillColor="#ffffff" android:pathData="M49,52 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z"/>
+    <path android:fillColor="#ffffff" android:pathData="M193,66 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z"/>
+    <path android:fillColor="#ffffff" android:pathData="M177,180 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z"/>
+</vector>
