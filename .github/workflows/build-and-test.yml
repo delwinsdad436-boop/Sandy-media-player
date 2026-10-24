@@ -1,0 +1,120 @@
+name: build-and-test
+
+# Sandy's online workshop: build the APK from this repo's own manual
+# aapt2 chain (build.sh), run the V180Test desktop unit harness, then
+# boot an emulator, install the APK, and prove the app actually launches.
+# A green run means: built + unit checks passed + app ran on a device.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install platform 34 + build-tools 34.0.0
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Recreate the local build layout build.sh expects
+        run: |
+          mkdir -p "$HOME/workspace/apk_build"
+          ln -sfn "$JAVA_HOME" "$HOME/workspace/apk_build/jdk-17.0.11+9"
+          ln -sfn "$ANDROID_SDK_ROOT" "$HOME/workspace/apk_build/android-sdk"
+          ln -sfn "$GITHUB_WORKSPACE" "$HOME/workspace/tala-tv-2026-10-16"
+          ls -la "$HOME/workspace" "$HOME/workspace/apk_build"
+
+      - name: Restore PNG resources from base64
+        run: bash ci/restore_binaries.sh
+
+      - name: Fetch dependency closure (work/maven + test jars)
+        run: python3 ci/fetch_deps.py
+
+      - name: Build the APK (project's own build.sh)
+        run: |
+          cd "$HOME/workspace/tala-tv-2026-10-16"
+          bash build.sh 2>&1 | tee "$GITHUB_WORKSPACE/ci-out-build.log"
+          ls -la build/*.apk
+        shell: bash
+
+      - name: Run V180Test unit harness (2,319 checks)
+        run: bash ci/run_v180test.sh
+
+      - name: Collect outputs
+        if: always()
+        run: |
+          mkdir -p out
+          cp build/*.apk out/ 2>/dev/null || true
+          cp ci-out/v180test.log out/ 2>/dev/null || true
+          cp ci-out-build.log out/ 2>/dev/null || true
+          ls -la out/
+
+      - name: Upload APK + unit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandy-apk-and-unit
+          path: out/
+          if-no-files-found: warn
+
+  emulator-launch:
+    needs: build-and-unit
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download built APK
+        uses: actions/download-artifact@v4
+        with:
+          name: sandy-apk-and-unit
+          path: dl
+
+      - name: Boot emulator, install, launch, verify
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: arm64-v8a
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
+          script: |
+            set -x
+            mkdir -p emu-out
+            APK=$(ls dl/*.apk | head -1)
+            echo "installing $APK"
+            adb install -r "$APK"
+            adb shell am start -W -n com.talacore.talatv/.SplashActivity
+            sleep 15
+            PID=$(adb shell pidof com.talacore.talatv || true)
+            echo "app pid: $PID"
+            adb shell dumpsys activity activities > emu-out/activities.txt || true
+            adb shell screencap -p /sdcard/shot.png || true
+            adb pull /sdcard/shot.png emu-out/screenshot.png || true
+            adb logcat -d > emu-out/logcat.txt || true
+            if [ -z "$PID" ]; then echo "LAUNCH VERDICT: FAIL - process not alive after launch"; exit 1; fi
+            if grep -A3 "FATAL EXCEPTION" emu-out/logcat.txt | grep -q "talacore"; then echo "LAUNCH VERDICT: FAIL - fatal exception for the app"; exit 1; fi
+            if ! grep -q "com.talacore.talatv" emu-out/activities.txt; then echo "LAUNCH VERDICT: FAIL - app not in activity stack"; exit 1; fi
+            echo "LAUNCH VERDICT: PASS - process $PID alive, app in activity stack"
+
+      - name: Upload emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandy-emulator-evidence
+          path: emu-out/
+          if-no-files-found: warn
