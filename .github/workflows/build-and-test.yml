@@ -114,29 +114,11 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
-          script: |
-            set -x
-            pwd; ls -la
-            OUT="$GITHUB_WORKSPACE/emu-out"
-            mkdir -p "$OUT"
-            echo "dl contents:"; ls -la "$GITHUB_WORKSPACE/dl" || true
-            APK=$(find "$GITHUB_WORKSPACE/dl" -name '*.apk' | head -1)
-            echo "installing $APK"
-            if [ -z "$APK" ]; then echo "LAUNCH VERDICT: FAIL - no APK found under dl/"; exit 1; fi
-            adb install -r "$APK"
-            adb shell am start -W -n com.talacore.talatv/.SplashActivity
-            sleep 15
-            PID=$(adb shell pidof com.talacore.talatv || true)
-            echo "app pid: $PID"
-            adb shell dumpsys activity activities > "$OUT/activities.txt" || true
-            adb shell screencap -p /sdcard/shot.png || true
-            adb pull /sdcard/shot.png "$OUT/screenshot.png" || true
-            adb logcat -d > "$OUT/logcat.txt" || true
-            if [ -z "$PID" ]; then echo "LAUNCH VERDICT: FAIL - process not alive after launch"; exit 1; fi
-            if grep -A3 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "talacore"; then echo "LAUNCH VERDICT: FAIL - fatal exception for the app"; exit 1; fi
-            if ! grep -q "com.talacore.talatv" "$OUT/activities.txt"; then echo "LAUNCH VERDICT: FAIL - app not in activity stack"; exit 1; fi
-            echo "LAUNCH VERDICT: PASS - process $PID alive, app in activity stack"
-
+          # One line on purpose: this action runs each script line as
+          # a separate sh -c, so variables die between lines (runs #9
+          # and #10, 2026-10-23). The real check lives in one file
+          # that runs in a single shell: ci/emulator_verify.sh.
+          script: bash "$GITHUB_WORKSPACE/ci/emulator_verify.sh"
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
