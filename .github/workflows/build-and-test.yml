@@ -119,6 +119,7 @@ jobs:
           # and #10, 2026-10-23). The real check lives in one file
           # that runs in a single shell: ci/emulator_verify.sh.
           script: bash "$GITHUB_WORKSPACE/ci/emulator_verify.sh"
+
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
