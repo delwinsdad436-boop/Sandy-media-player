@@ -116,21 +116,25 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
           script: |
             set -x
-            mkdir -p emu-out
-            APK=$(ls dl/*.apk | head -1)
+            pwd; ls -la
+            OUT="$GITHUB_WORKSPACE/emu-out"
+            mkdir -p "$OUT"
+            echo "dl contents:"; ls -la "$GITHUB_WORKSPACE/dl" || true
+            APK=$(find "$GITHUB_WORKSPACE/dl" -name '*.apk' | head -1)
             echo "installing $APK"
+            if [ -z "$APK" ]; then echo "LAUNCH VERDICT: FAIL - no APK found under dl/"; exit 1; fi
             adb install -r "$APK"
             adb shell am start -W -n com.talacore.talatv/.SplashActivity
             sleep 15
             PID=$(adb shell pidof com.talacore.talatv || true)
             echo "app pid: $PID"
-            adb shell dumpsys activity activities > emu-out/activities.txt || true
+            adb shell dumpsys activity activities > "$OUT/activities.txt" || true
             adb shell screencap -p /sdcard/shot.png || true
-            adb pull /sdcard/shot.png emu-out/screenshot.png || true
-            adb logcat -d > emu-out/logcat.txt || true
+            adb pull /sdcard/shot.png "$OUT/screenshot.png" || true
+            adb logcat -d > "$OUT/logcat.txt" || true
             if [ -z "$PID" ]; then echo "LAUNCH VERDICT: FAIL - process not alive after launch"; exit 1; fi
-            if grep -A3 "FATAL EXCEPTION" emu-out/logcat.txt | grep -q "talacore"; then echo "LAUNCH VERDICT: FAIL - fatal exception for the app"; exit 1; fi
-            if ! grep -q "com.talacore.talatv" emu-out/activities.txt; then echo "LAUNCH VERDICT: FAIL - app not in activity stack"; exit 1; fi
+            if grep -A3 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "talacore"; then echo "LAUNCH VERDICT: FAIL - fatal exception for the app"; exit 1; fi
+            if ! grep -q "com.talacore.talatv" "$OUT/activities.txt"; then echo "LAUNCH VERDICT: FAIL - app not in activity stack"; exit 1; fi
             echo "LAUNCH VERDICT: PASS - process $PID alive, app in activity stack"
 
       - name: Upload emulator evidence
