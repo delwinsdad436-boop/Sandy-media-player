@@ -54,9 +54,13 @@ import java.util.concurrent.Executors;
  * a failure while opening is filed to the crash log (Settings ▸
  * Crash reports) instead of taking the app down.
  *
- * A future programme can be set to record right from its row: the
- * tap lands on the set-timer screen with the programme's channel
- * and frame prefilled (TimerFrame visible before commit).
+ * The guide no longer schedules recordings (v0.20.0, James's
+ * field ruling: the guide was a good idea as a mechanism, but
+ * recording is the hand timer's job). Tapping a future programme
+ * opens the set-timer screen with ONLY that programme's channel
+ * prefilled — no title, no start, no stop ride along from guide
+ * data. Date, start and how long are set there, in the timer's
+ * own terms. The guide itself is what's-on display, untouched.
  */
 public class GuideActivity extends Activity {
 
@@ -357,7 +361,10 @@ public class GuideActivity extends Activity {
                 : data.day(GuideStore.baseId(c.tvgId), dayStart, dayLen);
         long now = System.currentTimeMillis();
         for (GuideModel.Programme p : dayRows) {
-            String mark = p.covers(now) ? "▶ " : (p.startMs > now ? "⏰ " : "");
+            // No ⏰ on future rows: a future tap no longer means
+            // "record this programme" — it opens the hand timer
+            // for the channel, and the row must not promise more.
+            String mark = p.covers(now) ? "▶ " : "";
             rowTitles.add(mark + GuideModel.formatTime(p.startMs, zone)
                     + "–" + GuideModel.formatTime(p.stopMs, zone)
                     + "  " + p.title);
@@ -378,7 +385,7 @@ public class GuideActivity extends Activity {
             if (p.covers(now)) {
                 play(dayChannel);
             } else if (p.startMs > now) {
-                confirmRecord(p);
+                openTimerForChannel();
             } else {
                 Toast.makeText(this, "That one already aired.",
                         Toast.LENGTH_SHORT).show();
@@ -424,17 +431,17 @@ public class GuideActivity extends Activity {
         return n;
     }
 
-    /** A future programme lands on the set-timer screen with its
-     *  channel and frame prefilled — the frame is VISIBLE (and
-     *  editable) before anything is committed (v0.12.1). */
-    private void confirmRecord(GuideModel.Programme p) {
+    /** "Record this channel", in the timer's own terms: a future
+     *  programme's tap opens the hand timer with ONLY the channel
+     *  prefilled — no programme title, start or stop is carried
+     *  over, so nothing is scheduled from guide data. The person
+     *  sets the date, the start and how long on the timer screen,
+     *  where the whole frame is visible before commit. */
+    private void openTimerForChannel() {
         Intent i = new Intent(this, SetTimerActivity.class);
         i.putExtra(SetTimerActivity.X_NAME, dayChannel.displayName());
         i.putExtra(SetTimerActivity.X_URL, dayChannel.url);
         i.putExtra(SetTimerActivity.X_TVG, GuideStore.baseId(dayChannel.tvgId));
-        i.putExtra(SetTimerActivity.X_TITLE, p.title);
-        i.putExtra(SetTimerActivity.X_START, p.startMs);
-        i.putExtra(SetTimerActivity.X_STOP, p.stopMs);
         startActivity(i);
     }
 

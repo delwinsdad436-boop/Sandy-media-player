@@ -81,6 +81,17 @@ public class PlayerActivity extends Activity {
     // buttons, buffer readout and Jump-to-LIVE all live under ONE
     // show/hide regime — nothing bolted on outside the timer.
     private Button tracksButton, prevButton, nextButton, jumpLiveButton, recButton;
+    // v0.20.0 (fixpass items 9a/9b): the Last-channel flip and
+    // the sleep timer — same unified chrome as everything else.
+    private Button lastButton, sleepButton;
+    private int sleepMinutes = 0;
+    private Runnable sleepRunnable;
+    // The flip pair: the live channel playing now (identity is
+    // re-pinned at every tune) and the one watched before it.
+    // The previous half is persisted (KeptPlaces kind "live",
+    // key "prev") so the pair survives activity restarts.
+    private String flipCurUrl, flipCurName = "", flipCurUa = "";
+    private String livePrevUrl = "", livePrevName = "", livePrevUa = "";
     private TextView leadText;
     private boolean chromeShown = true;
     private boolean liveNow = false;
@@ -188,6 +199,10 @@ public class PlayerActivity extends Activity {
     // a retry. Failure words ride along so the error surface
     // states what the server actually said.
     private boolean hydraWalked = false;
+    // v0.20.0 (item 7): the sibling heal ladder gets ONE walk
+    // per failure episode, like Hydra's same-address walk —
+    // reset at every tune-in (playCurrent).
+    private boolean healWalked = false;
     private boolean lastFailNetwork = false;
     private String lastFailWords = "";
 
@@ -233,6 +248,9 @@ public class PlayerActivity extends Activity {
         // The kept place, snapshotted BEFORE this session's own ticker
         // can overwrite it — the offer is computed from this snapshot.
         keptSnapshot = ChannelStore.getKeptLive(this);
+        // The flip's previous channel, restored before any tune
+        // can overwrite it (item 9a).
+        loadPrevLive();
         epShowId = getIntent().getIntExtra("epShowId", -1);
         epSeason = getIntent().getIntExtra("epSeason", 0);
         epNumber = getIntent().getIntExtra("epNumber", 0);
@@ -401,6 +419,35 @@ public class PlayerActivity extends Activity {
         shLp.setMargins(0, dp(110), dp(10), 0);
         root.addView(shareButton, shLp);
         shareButton.setOnClickListener(v -> { pokeChrome(); showShareDialog(); });
+
+        // Last channel (v0.20.0, item 9a): the two-channel flip,
+        // in the same right-hand chrome column under Share. Live
+        // surfing only — applyChromeVisibility hides it elsewhere.
+        lastButton = new Button(this);
+        Sanctuary.styleButton(this, lastButton, false);
+        lastButton.setText(LangStore.tr(this, "player_last_channel"));
+        lastButton.setContentDescription(LangStore.tr(this, "player_last_channel"));
+        lastButton.setAlpha(0.75f);
+        FrameLayout.LayoutParams lastLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.END);
+        lastLp.setMargins(0, dp(162), dp(10), 0);
+        root.addView(lastButton, lastLp);
+        lastButton.setOnClickListener(v -> { pokeChrome(); flipToLastChannel(); });
+
+        // Sleep timer (v0.20.0, item 9b): one tap cycles the
+        // standing choice (Off → 15 → 30 → 45 → 60 → 90 → Off);
+        // the label always shows the choice that stands.
+        sleepButton = new Button(this);
+        Sanctuary.styleButton(this, sleepButton, false);
+        sleepButton.setAlpha(0.75f);
+        FrameLayout.LayoutParams slLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.END);
+        slLp.setMargins(0, dp(214), dp(10), 0);
+        root.addView(sleepButton, slLp);
+        updateSleepButton();
+        sleepButton.setOnClickListener(v -> { pokeChrome(); cycleSleep(); });
         // On-demand transport extras (v0.9.0): −10s / +10s and the
         // speed cycle, for anything with a real timeline — catalogue
         // titles and the local set. Live surfing keeps its own
@@ -728,6 +775,13 @@ public class PlayerActivity extends Activity {
                     if (contentKey != null) {
                         ChannelStore.setWatched(PlayerActivity.this, contentKey, true);
                         ChannelStore.savePosition(PlayerActivity.this, contentKey, 0);
+                        // Played to the end: the Continue
+                        // Watching entry is done too (item 5).
+                        // Recordings playback never wrote one.
+                        if (!isRecordingPlay) {
+                            ContinueWatching.remove(
+                                    PlayerActivity.this, contentKey);
+                        }
                     }
                     if (localMode) {
                         // A finished file clears its place, then the
@@ -947,6 +1001,12 @@ public class PlayerActivity extends Activity {
                 ? View.VISIBLE : View.GONE);
         recButton.setVisibility(chromeShown && liveNow && !isRecordingPlay
                 ? View.VISIBLE : View.GONE);
+        if (lastButton != null) {
+            // The flip is a live-surfing control only (item 9a).
+            lastButton.setVisibility(chromeShown && liveNow && !isRecordingPlay
+                    ? View.VISIBLE : View.GONE);
+        }
+        if (sleepButton != null) sleepButton.setVisibility(v);
         if (skipRow != null) {
             skipRow.setVisibility(chromeShown && (contentKey != null || localMode)
                     ? View.VISIBLE : View.GONE);
@@ -1193,12 +1253,17 @@ public class PlayerActivity extends Activity {
 
     private void playCurrent() {
         M3uParser.Channel c = queue.get(index);
+        // Read before the bookkeeping below clears it: a
+        // maintenance re-prepare is the SAME channel walking
+        // through another door, never a channel change.
+        boolean wasMaintenanceReprepare = maintenanceReprepare;
         titleText.setText(c.displayName());
         currentChannelName = c.displayName();
         cancelWatchdog();
         dubTrackApplied = false;
         hapticFired = false;
         hydraWalked = false;
+        healWalked = false;
         // v0.14.1 continuity bookkeeping: a fresh tune is a new
         // stream for the law — it has not PLAYED yet — and any
         // tune that isn't maintenance's own re-prepare ends the
@@ -1225,6 +1290,23 @@ public class PlayerActivity extends Activity {
         // "Live" for the buffer/readout: surfing (no content key) over
         // the network. On-demand titles keep their own progress UI.
         liveNow = contentKey == null && !isLocal;
+        // The flip pair (item 9a): a tune to a DIFFERENT live
+        // channel files the channel just left as the previous
+        // one (persisted at once). A maintenance re-prepare, a
+        // heal switch, a resume — same station, new door — only
+        // re-pins the current identity; the pair is untouched.
+        if (liveNow && !isRecordingPlay) {
+            if (!wasMaintenanceReprepare && flipCurUrl != null
+                    && !flipCurUrl.equals(c.url)) {
+                livePrevUrl = flipCurUrl;
+                livePrevName = flipCurName;
+                livePrevUa = flipCurUa;
+                persistPrevLive();
+            }
+            flipCurUrl = c.url;
+            flipCurName = c.displayName();
+            flipCurUa = c.userAgent == null ? "" : c.userAgent;
+        }
         if (liveNow && currentUrl != null && !currentUrl.equals(c.url)) {
             // The buffer belongs to the channel it was built from:
             // changing channels discards it (a buffer, not a recording).
@@ -1359,6 +1441,132 @@ public class PlayerActivity extends Activity {
         player.setPlayWhenReady(!(willOfferResume || willOfferLive));
         armWatchdog(c.displayName());
         restartPinger();
+    }
+
+    // -------------------------------------- last-channel flip (item 9a)
+
+    /** The persisted previous live channel, in the kept-live
+     *  file under kind "live" / key "prev" — the same JSON shape
+     *  as ChannelStore.KeptLive (url / name / ua). */
+    private void loadPrevLive() {
+        try {
+            String raw = KeptPlaces.getExtra(this, "live", "prev");
+            if (raw == null || raw.isEmpty()) return;
+            org.json.JSONObject o = new org.json.JSONObject(raw);
+            livePrevUrl = o.optString("url", "");
+            livePrevName = o.optString("name", "");
+            livePrevUa = o.optString("ua", "");
+        } catch (Exception ignored) { }
+    }
+
+    private void persistPrevLive() {
+        try {
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("url", livePrevUrl == null ? "" : livePrevUrl);
+            o.put("name", livePrevName == null ? "" : livePrevName);
+            o.put("ua", livePrevUa == null ? "" : livePrevUa);
+            KeptPlaces.putPlace(this, "live", "prev", 0, o.toString());
+        } catch (Exception ignored) { }
+    }
+
+    /**
+     * The Last tap: swap to the previously watched live channel.
+     * The swap goes through playCurrent — the normal tune-in
+     * path, proof and continuity and all, never a raw prepare —
+     * and playCurrent's bookkeeping files the channel just left
+     * as the new previous, so the next tap flips back. The pair
+     * toggles. The previous channel is found in the surfing
+     * queue when it stands there; else in the loaded cache
+     * (which then becomes the queue, restoring the surfing
+     * context); else it is rebuilt from the persisted pair.
+     */
+    private void flipToLastChannel() {
+        if (!liveNow || isRecordingPlay) return;
+        if (livePrevUrl == null || livePrevUrl.isEmpty()) {
+            Toast.makeText(this, LangStore.tr(this, "player_no_last_channel"),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        errorBox.setVisibility(View.GONE);
+        resumeBar.setVisibility(View.GONE);
+        if (queue != null) {
+            for (int i = 0; i < queue.size(); i++) {
+                if (livePrevUrl.equals(queue.get(i).url)) {
+                    index = i;
+                    playCurrent();
+                    return;
+                }
+            }
+        }
+        List<M3uParser.Channel> cache = ChannelStore.loadCache(this);
+        if (cache != null) {
+            for (int i = 0; i < cache.size(); i++) {
+                if (livePrevUrl.equals(cache.get(i).url)) {
+                    queue = new ArrayList<>(cache);
+                    ChannelStore.playQueue = queue;
+                    ChannelStore.playIndex = i;
+                    index = i;
+                    playCurrent();
+                    return;
+                }
+            }
+        }
+        M3uParser.Channel c = new M3uParser.Channel();
+        c.url = livePrevUrl;
+        c.name = livePrevName == null || livePrevName.isEmpty()
+                ? livePrevUrl : livePrevName;
+        c.userAgent = livePrevUa == null ? "" : livePrevUa;
+        queue = java.util.Collections.singletonList(c);
+        ChannelStore.playQueue = queue;
+        ChannelStore.playIndex = 0;
+        index = 0;
+        playCurrent();
+    }
+
+    // ------------------------------------------ sleep timer (item 9b)
+
+    private void updateSleepButton() {
+        if (sleepButton == null) return;
+        String t = sleepMinutes <= 0
+                ? LangStore.tr(this, "player_sleep_off")
+                : String.format(Locale.US,
+                        LangStore.tr(this, "player_sleep_set"), sleepMinutes);
+        sleepButton.setText(t);
+        sleepButton.setContentDescription(t);
+    }
+
+    /** One tap advances the standing choice and re-arms (or
+     *  disarms) the timer: a new selection always cancels the
+     *  old countdown. The step cycle itself is HealLadder's,
+     *  pinned by the harness. */
+    private void cycleSleep() {
+        sleepMinutes = HealLadder.nextSleep(sleepMinutes);
+        updateSleepButton();
+        armSleepTimer();
+    }
+
+    private void armSleepTimer() {
+        if (sleepRunnable != null) handler.removeCallbacks(sleepRunnable);
+        sleepRunnable = null;
+        if (sleepMinutes <= 0 || destroyed) return;
+        sleepRunnable = () -> {
+            if (destroyed) return;
+            // Expiry stops PLAYBACK and closes the player. It
+            // never touches a recording: ● Record runs through
+            // Downloads' own DownloadManager, a separate service
+            // this activity neither owns nor stops (leaving the
+            // player mid-recording is already an ordinary act).
+            sleepMinutes = 0;
+            Toast.makeText(PlayerActivity.this,
+                    LangStore.tr(PlayerActivity.this, "player_sleep_done"),
+                    Toast.LENGTH_LONG).show();
+            if (player != null) {
+                player.setPlayWhenReady(false);
+                player.stop();
+            }
+            finish();
+        };
+        handler.postDelayed(sleepRunnable, sleepMinutes * 60_000L);
     }
 
     private void maybeOfferResume() {
@@ -2758,11 +2966,52 @@ public class PlayerActivity extends Activity {
         }
     }
 
+    /**
+     * The Continue Watching writer (v0.20.0, item 5): a NON-live
+     * stream playback with a content key leaves its place in the
+     * Continue Watching store, keyed by that key, so a shelf can
+     * offer "pick up where you left off" across doors — the
+     * per-door position above (placeKey) only serves this
+     * player's own resume offer. Live channels write nothing
+     * (their place is the kept-live record); recordings playback
+     * writes nothing (a recording is a file on this phone, not a
+     * stream to resume-resolve); the local set has no content
+     * key and writes nothing. The address filed is the one that
+     * actually played — currentUrl, which follows Hydra door
+     * switches — never a poster: this player has none to give,
+     * so the image is honestly empty.
+     */
+    private void writeContinueWatching() {
+        if (contentKey == null || isRecordingPlay || localMode
+                || player == null) return;
+        long pos = player.getCurrentPosition();
+        if (pos <= 0) return;
+        long dur = player.getDuration();
+        String title = "", streamName = "";
+        String playUrl = currentUrl == null ? "" : currentUrl;
+        if (queue != null && index >= 0 && index < queue.size()) {
+            M3uParser.Channel c = queue.get(index);
+            title = c.displayName();
+            streamName = c.name == null ? "" : c.name;
+            if (playUrl.isEmpty() && c.url != null) playUrl = c.url;
+        }
+        if (playUrl.isEmpty()) return;
+        ContinueWatching.upsert(this, contentKey, title, "", playUrl,
+                streamName, pos, dur == C.TIME_UNSET ? 0 : dur);
+    }
+
     @Override
     protected void onPause() {
         savePlace();
         saveKept();
+        writeContinueWatching();
         super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        writeContinueWatching();
+        super.onStop();
     }
 
     // ------------------------------------------------- continuity (v0.14.1)
@@ -2988,13 +3237,124 @@ public class PlayerActivity extends Activity {
         return out;
     }
 
+    // -------------------------------------- quiet self-healing (item 7)
+    // The sibling walk. Placement is the law's, deliberately:
+    // this runs ONLY at a terminal moment — inside verdictAdvance
+    // (which the continuity law reaches solely on an ADVANCE
+    // decision; HOLD_STALL and RECONNECT never call it, so the
+    // ladder can never overrule the law) and inside finishFailure
+    // (the tune-in terminal path, after Hydra's same-address walk
+    // is already spent). LIVE channels only: a VOD failure keeps
+    // today's behavior exactly — a single-source title has no
+    // siblings to heal from in this law.
+
+    /**
+     * Try the heal ladder for the channel failing right now.
+     * Returns true when a walk was started: {@code onExhausted}
+     * runs on the main thread only if every sibling fails its
+     * proof (or the viewer has moved on — then nothing runs).
+     * A sibling counts ONLY on the player's own segment-tier
+     * proof: HydraResolver.proveExhaustive with the result at
+     * LinkHealth.TIER_PLAYS — no connects, no slow, no mercy.
+     */
+    private boolean tryHeal(Runnable onExhausted) {
+        if (healWalked || destroyed) return false;
+        if (!liveNow || localMode || isRecordingPlay || contentKey != null) {
+            return false;
+        }
+        if (queue == null || index < 0 || index >= queue.size()) return false;
+        final M3uParser.Channel failed = queue.get(index);
+        if (failed == null || !LinkHealth.isRemote(failed.url)) return false;
+        List<M3uParser.Channel> all =
+                ChannelStore.loadCache(getApplicationContext());
+        if (all == null || all.isEmpty()) all = queue;
+        final List<M3uParser.Channel> ladder = HealLadder.ladder(all, failed);
+        if (ladder.isEmpty()) return false;
+        healWalked = true;
+        final String failedUrl = failed.url;
+        final int idx = index;
+        new Thread(() -> {
+            for (M3uParser.Channel cand : ladder) {
+                if (destroyed) return;
+                HydraResolver.Outcome o = HydraResolver.proveExhaustive(
+                        getApplicationContext(), cand.url, cand.userAgent, null);
+                if (o != null && o.result != null
+                        && o.result.tier == LinkHealth.TIER_PLAYS) {
+                    final String door = o.url;
+                    final M3uParser.Channel fc = cand;
+                    handler.post(() -> healSwitch(idx, failedUrl, fc, door));
+                    return;
+                }
+            }
+            handler.post(() -> {
+                if (destroyed || onExhausted == null) return;
+                // The viewer surfed away mid-walk: their move
+                // stands, no verdict lands on a channel they left.
+                if (queue == null || index != idx || idx >= queue.size()
+                        || !failedUrl.equals(queue.get(idx).url)) return;
+                onExhausted.run();
+            });
+        }, "heal-ladder").start();
+        return true;
+    }
+
+    /**
+     * A sibling proved at the segment tier: switch to its proven
+     * door silently — no verdict words, no error flash — file the
+     * HEAL event with both addresses, and reset the failure
+     * accounting the way a successful tune-in does (a fresh door
+     * gets fresh chances: strikes cleared, both walks re-armed).
+     */
+    private void healSwitch(int idx, String failedUrl,
+                            M3uParser.Channel cand, String door) {
+        if (destroyed || queue == null || index != idx
+                || idx >= queue.size()) return;
+        M3uParser.Channel c = queue.get(idx);
+        if (!failedUrl.equals(c.url)) return;   // the viewer moved on
+        PlaybackRecord.Facts f = playbackFacts();
+        f.decision = "HEAL";
+        f.note = "a sibling entry for this channel proved at the "
+                + "segment tier — old=" + failedUrl + " new=" + door;
+        PlaybackRecord.write(this, "HEAL", f);
+        c.url = door;
+        if (cand.userAgent != null && !cand.userAgent.isEmpty()) {
+            c.userAgent = cand.userAgent;
+        }
+        consecutiveFails = 0;
+        hydraWalked = false;
+        healWalked = false;
+        lastFailNetwork = false;
+        lastFailWords = "";
+        recovering = false;
+        recoveryGen++;
+        // The station didn't change — only its door: the flip
+        // pair must not learn this as a channel change.
+        flipCurUrl = door;
+        errorBox.setVisibility(View.GONE);
+        playCurrent();
+        if (player != null) player.setPlayWhenReady(true);
+    }
+
     /**
      * The verdict, when the law finally allows one: the words
      * name what ended, the health record files the walked truth,
      * and the advance (when the viewer left auto-skip on) is a
      * verdict, not a strike — consecutiveFails is untouched.
+     *
+     * v0.20.0 (item 7): before any of that is spoken, the heal
+     * ladder gets its walk — the law has already decided this
+     * channel's own doors are done (ADVANCE is the only road
+     * here), and a proven sibling is not a reprieve from the
+     * law but the channel itself, standing at another address.
+     * Only a spent ladder lets the verdict land, unchanged.
      */
     private void verdictAdvance(int family, HydraResolver.Outcome o) {
+        if (destroyed) return;
+        if (tryHeal(() -> verdictAdvanceNow(family, o))) return;
+        verdictAdvanceNow(family, o);
+    }
+
+    private void verdictAdvanceNow(int family, HydraResolver.Outcome o) {
         if (destroyed) return;
         recovering = false;
         recoveryGen++;
@@ -3280,8 +3640,27 @@ public class PlayerActivity extends Activity {
 
     /** The give-up path a failure reaches when Hydra's ladder is
      *  spent (or never applied): auto-skip or the error box, as
-     *  before — with the failure's own words in the sentence. */
+     *  before — with the failure's own words in the sentence.
+     *
+     *  v0.20.0 (item 7): for a LIVE channel this is a terminal
+     *  moment, so the heal ladder walks first (Hydra's
+     *  same-address manners are already spent by the time a
+     *  failure lands here — siblings are what remain). A proven
+     *  sibling switches silently and this method never speaks;
+     *  a spent ladder falls through to the unchanged verdict
+     *  below. tryHeal itself carries the live-only gates, so
+     *  VOD and local failures reach finishFailureNow untouched. */
     private void finishFailure(String message) {
+        if (destroyed) return;
+        if (tryHeal(() -> finishFailureNow(message))) {
+            Toast.makeText(this, LangStore.tr(this, "hydra_trying"),
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        finishFailureNow(message);
+    }
+
+    private void finishFailureNow(String message) {
         if (destroyed) return;
         if (player != null) player.stop();
         consecutiveFails++;
@@ -3317,6 +3696,8 @@ public class PlayerActivity extends Activity {
         }
         savePlace();
         saveKept();
+        writeContinueWatching();
+        if (sleepRunnable != null) handler.removeCallbacks(sleepRunnable);
         cancelWatchdog();
         handler.removeCallbacksAndMessages(null);
         if (player != null) {

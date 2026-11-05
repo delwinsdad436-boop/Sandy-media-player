@@ -104,7 +104,7 @@ public class SourcesActivity extends Activity {
 
         statusView = new TextView(this);
         statusView.setTextColor(Color.rgb(170, 170, 180));
-        statusView.setTextSize(12);
+        statusView.setTextSize(14);
         statusView.setText("Looking for sources — your playlists and the "
                 + "videos on this phone first, then the Internet Archive…");
         root.addView(statusView);
@@ -849,7 +849,7 @@ public class SourcesActivity extends Activity {
                 main.setTextSize(15);
                 sub = new TextView(SourcesActivity.this);
                 sub.setTextColor(Color.rgb(150, 150, 160));
-                sub.setTextSize(12);
+                sub.setTextSize(14);
                 ll.addView(main);
                 ll.addView(sub);
             }

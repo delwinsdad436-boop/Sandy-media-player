@@ -82,14 +82,14 @@ public class VodActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText("Movies & VOD — from your playlists");
-        title.setTextSize(19);
+        title.setTextSize(Sanctuary.TEXT_PAGE_TITLE);
         Sanctuary.goldText(title);
         title.setTypeface(title.getTypeface(), Typeface.BOLD);
         root.addView(title);
 
         sub = new TextView(this);
         sub.setTextColor(Sanctuary.MUTED);
-        sub.setTextSize(12);
+        sub.setTextSize(Sanctuary.TEXT_META);
         root.addView(sub);
 
         workingOnlyBox = new CheckBox(this);
@@ -112,7 +112,7 @@ public class VodActivity extends Activity {
         root.addView(scanBtn);
         scanLine = new TextView(this);
         scanLine.setTextColor(Sanctuary.SUB);
-        scanLine.setTextSize(12);
+        scanLine.setTextSize(Sanctuary.TEXT_META);
         root.addView(scanLine);
 
         ListView list = new ListView(this);
@@ -153,9 +153,9 @@ public class VodActivity extends Activity {
                             ? (TextView) convertView : new TextView(VodActivity.this);
                     tv.setText((String) row);
                     tv.setTextColor(Sanctuary.GOLD_TEXT);
-                    tv.setTextSize(14);
+                    tv.setTextSize(16);
                     tv.setTypeface(tv.getTypeface(), Typeface.BOLD);
-                    tv.setPadding(dp(6), dp(12), dp(6), dp(4));
+                    tv.setPadding(dp(6), dp(12), dp(6), dp(6));
                     tv.setBackgroundColor(Sanctuary.PANEL_HI);
                     return tv;
                 }
@@ -169,13 +169,13 @@ public class VodActivity extends Activity {
                 } else {
                     ll = new LinearLayout(VodActivity.this);
                     ll.setOrientation(LinearLayout.VERTICAL);
-                    ll.setPadding(dp(8), dp(8), dp(8), dp(8));
+                    ll.setPadding(dp(8), dp(12), dp(8), dp(12));
                     main = new TextView(VodActivity.this);
                     main.setTextColor(Sanctuary.INK);
                     main.setTextSize(15);
                     subT = new TextView(VodActivity.this);
                     subT.setTextColor(Sanctuary.SUB);
-                    subT.setTextSize(12);
+                    subT.setTextSize(Sanctuary.TEXT_META);
                     ll.addView(main);
                     ll.addView(subT);
                 }

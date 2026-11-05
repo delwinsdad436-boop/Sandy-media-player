@@ -102,20 +102,59 @@ public final class Sanctuary {
     // -------------------------------------------------- the rhythm
     /** Page padding on main surfaces. */
     public static final int PAGE_PAD_DP = 16;
+    /**
+     * Dormant TV token (fixpass-0200 restyle, design-diff §4):
+     * the documented 5% overscan margin for a future TV surface.
+     * Phone layouts do NOT use it.
+     */
+    public static final int PAGE_PAD_TV_DP = 48;
     /** Air above a section header. */
-    public static final int SECTION_GAP_DP = 20;
+    public static final int SECTION_GAP_DP = 24;
     /** Rail card stride — ONE geometry for every poster rail. */
     public static final int RAIL_CARD_W_DP = 116;
     /** Rail poster width inside the card. */
     public static final int RAIL_IMG_W_DP = 108;
-    /** Rail poster height inside the card (2:3, as posters are). */
-    public static final int RAIL_IMG_H_DP = 152;
-    /** Grid poster height (grids share width by weight). */
-    public static final int GRID_IMG_H_DP = 150;
+    /** Rail poster height inside the card (true 2:3 at 108 wide). */
+    public static final int RAIL_IMG_H_DP = 162;
+    /** Grid poster height (2:3 at the ~104dp a 3-column phone
+     *  grid cell actually gets; grids share width by weight). */
+    public static final int GRID_IMG_H_DP = 156;
     /** Glass panel corner. */
     public static final int PANEL_RADIUS_DP = 12;
-    /** Poster tile corner. */
-    public static final int TILE_RADIUS_DP = 10;
+    /** Poster tile corner (restyle: reads as art, not card). */
+    public static final int TILE_RADIUS_DP = 8;
+    /** Hero billboard height (restyle, design-diff §2). */
+    public static final int HERO_H_DP = 288;
+    /** Minimum height of a primary action (restyle, §10). */
+    public static final int BTN_H_DP = 48;
+
+    // ---------------------------------------------------- the type
+    // One type scale for the main surfaces (restyle, §5). The
+    // floor is a hard accessibility constraint for Sandy's older
+    // viewers: no body/caption text on a main surface below
+    // TEXT_FLOOR, and no restyle move ever reduces a size.
+    /** Page titles (raised to this where they stood below it). */
+    public static final int TEXT_PAGE_TITLE = 26;
+    /** Section headers: white, bold, structural. */
+    public static final int TEXT_SECTION = 20;
+    /** Hero billboard title. */
+    public static final int TEXT_HERO_TITLE = 30;
+    /** Body / summary text. */
+    public static final int TEXT_BODY = 15;
+    /** Names under posters (kept for older viewers). */
+    public static final int TEXT_TILE_NAME = 14;
+    /** Meta / status / mark lines — also the floor. */
+    public static final int TEXT_META = 14;
+    /** The floor: nothing smaller on a main surface. */
+    public static final int TEXT_FLOOR = 14;
+
+    // --------------------------------------------------- the focus
+    /** Focus pop scale — the documented TV genre scale (~1.1). */
+    public static final float FOCUS_SCALE = 1.10f;
+    /** Focus elevation, in dp (converted at the call site). */
+    public static final int FOCUS_ELEVATION_DP = 8;
+    /** Focus pop duration, ms. */
+    public static final int FOCUS_ANIM_MS = 160;
 
     public static int dp(Context ctx, int v) {
         return (int) (v * ctx.getResources().getDisplayMetrics().density + 0.5f);
@@ -143,10 +182,12 @@ public final class Sanctuary {
     }
 
     /**
-     * Smoked glass with a thin lit edge. Resting, the edge is a
-     * quiet gold-to-teal gradient; focused, pressed, or selected,
-     * the same edge lights fully and throws a soft glow — the
-     * streamers' focus language, in the sanctuary's two colors.
+     * Smoked glass. RESTYLE (fixpass-0200, design-diff §1): at
+     * rest the panel is UNFRAMED — flat glass fill, no lit edge;
+     * the streamers reserve light for focus, and so does Sandy
+     * now. Focused, pressed, or selected, the gold-to-teal edge
+     * lights fully and throws a soft glow — the sanctuary's
+     * focus language, unchanged, just no longer spent at rest.
      */
     public static Drawable glassPanel(Context ctx) {
         float d = ctx.getResources().getDisplayMetrics().density;
@@ -157,11 +198,18 @@ public final class Sanctuary {
                 new LitEdgeDrawable(d, PANEL_RADIUS_DP, true));
         s.addState(new int[]{android.R.attr.state_selected},
                 new LitEdgeDrawable(d, PANEL_RADIUS_DP, true));
-        s.addState(new int[]{}, new LitEdgeDrawable(d, PANEL_RADIUS_DP, false));
+        s.addState(new int[]{}, new LitEdgeDrawable(d, PANEL_RADIUS_DP,
+                false, PANEL_HI, PANEL, false));
         return s;
     }
 
-    /** The poster frame: the void, edged; lit when its card is. */
+    /**
+     * The poster frame: at rest, NO frame at all — the void fill
+     * only, art sitting raw on the ground (design-diff §1, the
+     * Disney+ rule: posters never sit in visible frames). The lit
+     * edge appears only when the poster state is focused (its
+     * card's state, via duplicateParentState at the call sites).
+     */
     public static Drawable posterFrame(Context ctx) {
         float d = ctx.getResources().getDisplayMetrics().density;
         StateListDrawable s = new StateListDrawable();
@@ -170,15 +218,34 @@ public final class Sanctuary {
                         POSTER_VOID, PANEL_DEEP));
         s.addState(new int[]{},
                 new LitEdgeDrawable(d, TILE_RADIUS_DP, false,
-                        POSTER_VOID, PANEL_DEEP));
+                        POSTER_VOID, PANEL_DEEP, false));
         return s;
     }
 
-    /** A text field's glass: deepest fill, resting edge. */
+    /**
+     * A text field's glass: deepest fill, resting edge KEPT —
+     * a field must stay findable on the ground; it is furniture,
+     * not art, so §1's unframing does not retire its quiet edge.
+     */
     public static Drawable field(Context ctx) {
         float d = ctx.getResources().getDisplayMetrics().density;
         return new LitEdgeDrawable(d, TILE_RADIUS_DP, false,
                 PANEL_DEEP, PANEL_DEEP);
+    }
+
+    /**
+     * The hero's bottom scrim (restyle, design-diff §2): art
+     * melts into the ground — transparent through the top ~half,
+     * the room's GROUND at the bottom, so title and meta text
+     * sitting in it survive any frame. Replaces the flat OVERLAY
+     * caption band on the hero only; OVERLAY keeps its player job.
+     */
+    public static Drawable heroScrim() {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x0007090C, 0x0007090C, GROUND});
+        g.setGradientType(GradientDrawable.LINEAR_GRADIENT);
+        return g;
     }
 
     /**
@@ -204,7 +271,9 @@ public final class Sanctuary {
                 new LitEdgeDrawable(d, PANEL_RADIUS_DP, true));
         s.addState(new int[]{android.R.attr.state_selected},
                 new LitEdgeDrawable(d, PANEL_RADIUS_DP, true));
-        s.addState(new int[]{}, new LitEdgeDrawable(d, PANEL_RADIUS_DP, false));
+        // Resting secondary button: flat glass, no edge (§1).
+        s.addState(new int[]{}, new LitEdgeDrawable(d, PANEL_RADIUS_DP,
+                false, PANEL_HI, PANEL, false));
         return s;
     }
 
@@ -218,16 +287,21 @@ public final class Sanctuary {
         return g;
     }
 
-    /** Style a button into the register (background + ink). */
+    /** Style a button into the register (background + ink).
+     *  A primary button also takes the genre's stature: a
+     *  BTN_H_DP minimum height (restyle, design-diff §10). */
     public static void styleButton(Context ctx, Button b, boolean primary) {
         b.setBackground(glassButton(ctx, primary));
         b.setTextColor(primary ? ON_GOLD : INK);
+        if (primary) b.setMinHeight(dp(ctx, BTN_H_DP));
     }
 
-    /** A chip: glass, lit when it carries the standing pick. */
+    /** A chip: glass, lit when it carries the standing pick;
+     *  unselected chips rest unframed like every panel (§1). */
     public static void styleChip(Context ctx, Button b, boolean selected) {
         float d = ctx.getResources().getDisplayMetrics().density;
-        b.setBackground(new LitEdgeDrawable(d, PANEL_RADIUS_DP, selected));
+        b.setBackground(new LitEdgeDrawable(d, PANEL_RADIUS_DP, selected,
+                PANEL_HI, PANEL, false));
         b.setTextColor(selected ? GOLD_TEXT : MUTED);
     }
 
@@ -256,9 +330,10 @@ public final class Sanctuary {
      * it as (or inside) the tile's focus listener.
      */
     public static void applyPop(View v, boolean focused) {
-        float s = focused ? 1.04f : 1.0f;
-        v.animate().scaleX(s).scaleY(s).setDuration(120).start();
-        v.setElevation(focused ? 8f : 0f);
+        float s = focused ? FOCUS_SCALE : 1.0f;
+        v.animate().scaleX(s).scaleY(s).setDuration(FOCUS_ANIM_MS).start();
+        v.setElevation(focused
+                ? dp(v.getContext(), FOCUS_ELEVATION_DP) : 0f);
     }
 
     public static void focusPop(View v) {
@@ -280,6 +355,9 @@ public final class Sanctuary {
         private final boolean lit;
         private final int fillTop;
         private final int fillBottom;
+        /** Restyle (§1): when false and not lit, NO edge is drawn
+         *  at rest — the fill runs to the bounds, unframed. */
+        private final boolean framedAtRest;
         private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint edgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -292,11 +370,17 @@ public final class Sanctuary {
 
         LitEdgeDrawable(float density, float radiusDp, boolean lit,
                         int fillTop, int fillBottom) {
+            this(density, radiusDp, lit, fillTop, fillBottom, true);
+        }
+
+        LitEdgeDrawable(float density, float radiusDp, boolean lit,
+                        int fillTop, int fillBottom, boolean framedAtRest) {
             this.density = density;
             this.radiusDp = radiusDp;
             this.lit = lit;
             this.fillTop = fillTop;
             this.fillBottom = fillBottom;
+            this.framedAtRest = framedAtRest;
             edgePaint.setStyle(Paint.Style.STROKE);
             glowPaint.setStyle(Paint.Style.STROKE);
         }
@@ -314,10 +398,13 @@ public final class Sanctuary {
         @Override public void draw(Canvas canvas) {
             Rect b = getBounds();
             float r = radiusDp * density;
+            boolean framed = lit || framedAtRest;
             float edgeW = (lit ? 2.2f : 1.1f) * density;
-            rect.set(b.left + edgeW / 2f, b.top + edgeW / 2f,
-                    b.right - edgeW / 2f, b.bottom - edgeW / 2f);
+            float inset = framed ? edgeW / 2f : 0f;
+            rect.set(b.left + inset, b.top + inset,
+                    b.right - inset, b.bottom - inset);
             canvas.drawRoundRect(rect, r, r, fillPaint);
+            if (!framed) return;   // unframed at rest: fill only
             if (lit) {
                 glowPaint.setStrokeWidth(7f * density);
                 glowPaint.setAlpha((int) (56 * alpha / 255f));

@@ -21,11 +21,14 @@ import java.util.TimeZone;
 /**
  * The VCR timer book (v0.11.0): every timer in the queue file —
  * what's set, what's recording, and how each finished one ended,
- * stated plainly. Two ways in, as ordered: from the TV Guide (tap a
- * future programme), or BY HAND here — any channel, any start, any
- * length, no guide required. The manual door matters: most of
- * Sandy's channels carry no guide data, and a timer must not depend
- * on the guide existing.
+ * stated plainly. This screen IS the recording mechanism's face
+ * (v0.20.0, James's field ruling): timers are set BY HAND here —
+ * any channel, any start, any length, no guide required, and they
+ * record in the background with the app closed. The guide no
+ * longer creates timers; its Timers button is only a door to
+ * this queue. The manual door matters: most of Sandy's channels
+ * carry no guide data, and a timer must not depend on the guide
+ * existing.
  */
 public class TimersActivity extends Activity {
 
@@ -68,7 +71,7 @@ public class TimersActivity extends Activity {
         root.addView(setBtn);
 
         emptyView = new TextView(this);
-        emptyView.setText(LangStore.tr(this, "timers_empty"));
+        emptyView.setText(LangStore.tr(this, "timers_empty_timer_first"));
         emptyView.setTextColor(Color.rgb(170, 170, 180));
         emptyView.setTextSize(13);
         root.addView(emptyView);
@@ -126,14 +129,26 @@ public class TimersActivity extends Activity {
         TimeZone zone = TimeZone.getDefault();
         for (TimerModel.Timer t : rows) {
             rowTitles.add(TimerUi.label(t));
+            // Channel · date · start–end · length · state — and
+            // for a SET row the state text carries the alarm kind
+            // as before (nothing extra when exact, the
+            // "approximate" warning when the fallback armed it).
             rowSub.add(t.channelName + " · "
                     + GuideModel.formatDay(t.startMs, zone) + " "
                     + GuideModel.formatTime(t.startMs, zone) + "–"
                     + GuideModel.formatTime(t.stopMs, zone) + " · "
-                    + TimerUi.stateText(this, t));
+                    + lengthText(TimerFrame.durationMinutes(t.startMs, t.stopMs))
+                    + " · " + TimerUi.stateText(this, t));
         }
         emptyView.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
         if (adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    /** "30 min", "1 h", "1 h 30 min", "4 h" — the timer's length. */
+    private String lengthText(long mins) {
+        if (mins < 60) return mins + " min";
+        long h = mins / 60, m = mins % 60;
+        return m == 0 ? h + " h" : h + " h " + m + " min";
     }
 
     private void confirmCancel(TimerModel.Timer t) {

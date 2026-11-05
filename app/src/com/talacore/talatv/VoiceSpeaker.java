@@ -59,6 +59,17 @@ public final class VoiceSpeaker {
     private SpeakQueue queue;
     private volatile int gen = 0;
 
+    // v0.20.0 (item 11): the utterance id of the system-TTS item
+    // currently in flight, or null when none is. Completions are
+    // accepted only for this id, so a stale or flushed utterance
+    // (e.g. after stop() or a superseding speak()) can never
+    // advance the queue a second time.
+    private String currentSystemId = null;
+    // v0.20.0 (item 11): onQueueDone fires exactly once per
+    // speak() call's drain. speak() re-arms this; next() sets it
+    // before firing and never fires again for that drain.
+    private boolean queueDoneSignaled = false;
+
     private OnnxVoiceSynth packSynth;
     private String packSynthCode = "";
     private AudioTrack packTrack;
@@ -110,10 +121,38 @@ public final class VoiceSpeaker {
                             new UtteranceProgressListener() {
                                 @Override public void onStart(String id) {}
                                 @Override public void onDone(String id) {
-                                    main.post(VoiceSpeaker.this::next);
+                                    main.post(() -> {
+                                        // v0.20.0 (item 11) FIX: this
+                                        // used to call next() WITHOUT
+                                        // advancing the queue — next()
+                                        // peeked the SAME item and
+                                        // spoke it again, forever: one
+                                        // word looped and onQueueDone
+                                        // never fired. A completion now
+                                        // advances exactly like the
+                                        // error path (minus the failure
+                                        // callback), and only for the
+                                        // utterance actually in flight:
+                                        // a stale, flushed or duplicate
+                                        // completion advances nothing.
+                                        if (currentSystemId == null) return;
+                                        if (id != null
+                                                && !currentSystemId.equals(id)) {
+                                            return;
+                                        }
+                                        currentSystemId = null;
+                                        if (queue != null) queue.advance();
+                                        next();
+                                    });
                                 }
                                 @Override public void onError(String id) {
                                     main.post(() -> {
+                                        if (currentSystemId == null) return;
+                                        if (id != null
+                                                && !currentSystemId.equals(id)) {
+                                            return;
+                                        }
+                                        currentSystemId = null;
                                         SpeakQueue.Item it = queue == null
                                                 ? null : queue.advance();
                                         if (listener != null && it != null) {
@@ -142,11 +181,26 @@ public final class VoiceSpeaker {
     public void speak(SpeakQueue q) {
         queue = q;
         gen++;
+        queueDoneSignaled = false;
         next();
+    }
+
+    /** v0.20.0 (item 11), ADDED — a minimal query the old
+     *  callbacks could not answer: is a voice still working
+     *  through the current queue (an item current or pending,
+     *  drain not yet signaled)? The Translator's failure
+     *  callbacks use it, deferred until the in-flight failure
+     *  dispatch settles, to tell "this item failed but the
+     *  voice goes on" from "the voice is done". Existing
+     *  callers (Speak For Me) never call it; their contract is
+     *  unchanged. */
+    public boolean isSpeaking() {
+        return queue != null && !queueDoneSignaled && queue.peek() != null;
     }
 
     public void stop() {
         gen++;
+        currentSystemId = null;
         if (tts != null) { try { tts.stop(); } catch (Throwable ignored) {} }
         stopPackTrack();
     }
@@ -166,7 +220,14 @@ public final class VoiceSpeaker {
         if (queue == null) return;
         SpeakQueue.Item item = queue.peek();
         if (item == null) {
-            if (listener != null) listener.onQueueDone();
+            // Exactly once per speak() drain (v0.20.0, item 11):
+            // a duplicate next() at the drain (a re-delivered
+            // completion, a second failure branch) does not fire
+            // onQueueDone again.
+            if (!queueDoneSignaled) {
+                queueDoneSignaled = true;
+                if (listener != null) listener.onQueueDone();
+            }
             return;
         }
         VoiceLangs.Row row = VoiceLangs.byIso1(VoiceLangs.load(ctx), item.iso1);
@@ -205,14 +266,18 @@ public final class VoiceSpeaker {
         } catch (Throwable ignored) {}
         Bundle params = new Bundle();
         params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f);
+        String utteranceId = "vs" + System.nanoTime();
+        currentSystemId = utteranceId;
         int res = tts.speak(item.text, TextToSpeech.QUEUE_FLUSH, params,
-                "vs" + System.nanoTime());
+                utteranceId);
         if (res == TextToSpeech.ERROR) {
+            currentSystemId = null;
             queue.advance();
             if (listener != null) listener.onItemFailed(item);
             next();
         }
-        // completion arrives via UtteranceProgressListener.onDone
+        // completion arrives via UtteranceProgressListener.onDone,
+        // which now advances the queue for this utterance id
     }
 
     /** The pack road — ReaderService's proven shape: synthesize
@@ -266,13 +331,20 @@ public final class VoiceSpeaker {
                 while (g == gen && track.getPlayState()
                         == AudioTrack.PLAYSTATE_PLAYING) {
                     if (track.getPlaybackHeadPosition() >= s16.length) break;
-                    try { Thread.sleep(90); } catch (InterruptedException e) {
-                        return;
-                    }
+                    // v0.20.0 (item 11): no silent return on
+                    // interrupt — that wedged the queue with no
+                    // advance, no failure and no onQueueDone.
+                    // InterruptedException now reaches the outer
+                    // catch and takes the pack-failure fail-over,
+                    // like every other pack failure.
+                    Thread.sleep(90);
                 }
                 boolean finished = g == gen
                         && track.getPlaybackHeadPosition() >= s16.length;
-                stopPackTrack();
+                // Release only this generation's track: if stop()
+                // or a newer speak() superseded this thread, the
+                // current packTrack is not this thread's to kill.
+                if (g == gen) stopPackTrack();
                 if (finished) {
                     main.post(() -> {
                         if (g == gen) {
@@ -280,7 +352,24 @@ public final class VoiceSpeaker {
                             next();
                         }
                     });
+                } else if (g == gen) {
+                    // v0.20.0 (item 11): playback stopped short of
+                    // the end with this generation still current —
+                    // that used to fall through silently (no
+                    // advance, no failure, no drain: the door
+                    // wedged). Treat it as a pack failure: disclose,
+                    // forget the pack, re-decide the item — the
+                    // phone's voice takes it, or NONE fails it and
+                    // the drain fires onQueueDone.
+                    main.post(() -> {
+                        if (g != gen) return;
+                        if (listener != null) listener.onPackFailed(code);
+                        forgetPack(code);
+                        next();
+                    });
                 }
+                // g != gen: superseded — the newer speak()/stop()
+                // owns the queue and its drain; fire nothing.
             } catch (Exception e) {
                 if (g != gen) return;
                 main.post(() -> {

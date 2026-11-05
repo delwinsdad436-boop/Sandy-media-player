@@ -1,6 +1,8 @@
 package com.talacore.talatv;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -120,6 +122,79 @@ public final class LiveGroups {
             }
         }
         return sortedByCount(map);
+    }
+
+    // ------------------------------------------ primary section
+    // fixpass-0200, item 13: the DEFAULT Live TV display is a
+    // PRIMARY-SECTION list — every channel in EXACTLY ONE section,
+    // so the thousands-long list reads as rooms, not one endless
+    // scroll. (groupBySection below stays multi-membership: it
+    // feeds the section TILES, where standing in both of your
+    // categories is the point.)
+
+    /** The section a channel with no known section lives in. */
+    public static final String OTHER_SECTION = "Other";
+
+    /**
+     * The standing head of the section order: the rooms a viewer
+     * looks for first, in this order. Any section not named here
+     * follows them A–Z, and {@link #OTHER_SECTION} is always last.
+     */
+    public static final List<String> SECTION_ORDER =
+            Collections.unmodifiableList(Arrays.asList(
+                    "News", "Sports", "Movies", "Kids", "Music"));
+
+    /**
+     * A channel's ONE primary section: the FIRST section in
+     * {@link #sectionsOf} order (the database's own category
+     * order, at most two, else the playlist group), or
+     * {@link #OTHER_SECTION} when neither source names one.
+     */
+    public static String primarySectionOf(M3uParser.Channel c) {
+        List<String> s = sectionsOf(c);
+        return s.isEmpty() ? OTHER_SECTION : s.get(0);
+    }
+
+    /** Standing rank of a section name (see {@link #SECTION_ORDER}):
+     *  named rooms by their place, unnamed rooms after them,
+     *  "Other" after everything. */
+    public static int sectionRank(String section) {
+        if (section == null || OTHER_SECTION.equalsIgnoreCase(section)) {
+            return Integer.MAX_VALUE;
+        }
+        for (int i = 0; i < SECTION_ORDER.size(); i++) {
+            if (SECTION_ORDER.get(i).equalsIgnoreCase(section)) return i;
+        }
+        return SECTION_ORDER.size();
+    }
+
+    /**
+     * Primary-section grouping for the default display: section
+     * name → its channels, each channel in EXACTLY ONE section
+     * (its {@link #primarySectionOf}). Sections are ordered by
+     * {@link #sectionRank}, ties A–Z (case-insensitive), "Other"
+     * last. Channels inside a section keep their INCOMING order —
+     * the caller's standing sort applies inside the section,
+     * never here.
+     */
+    public static Map<String, List<M3uParser.Channel>> groupByPrimarySection(
+            List<M3uParser.Channel> channels) {
+        Map<String, List<M3uParser.Channel>> buckets = new LinkedHashMap<>();
+        if (channels != null) {
+            for (M3uParser.Channel c : channels) {
+                if (c == null) continue;
+                buckets.computeIfAbsent(primarySectionOf(c),
+                        k -> new ArrayList<>()).add(c);
+            }
+        }
+        List<String> names = new ArrayList<>(buckets.keySet());
+        names.sort((a, b) -> {
+            int d = Integer.compare(sectionRank(a), sectionRank(b));
+            return d != 0 ? d : a.compareToIgnoreCase(b);
+        });
+        Map<String, List<M3uParser.Channel>> out = new LinkedHashMap<>();
+        for (String n : names) out.put(n, buckets.get(n));
+        return out;
     }
 
     /** section name → its channels (count desc, then A–Z). A channel

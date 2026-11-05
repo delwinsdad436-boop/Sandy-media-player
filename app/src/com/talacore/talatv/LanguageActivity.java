@@ -12,6 +12,7 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -55,7 +56,14 @@ public class LanguageActivity extends Activity {
         sub.setPadding(0, dp(4), 0, dp(8));
         root.addView(sub);
 
-        List<String[]> langs = LangStore.pickerLanguages(this);
+        // A–Z (fixpass-0200, item 12): the chooser renders its
+        // entries A–Z by display name. Display-side only — this
+        // sorts a copy; LangStore.pickerLanguages and the
+        // UiStrings tables keep their own order underneath.
+        // Nothing here pinned the current language first (it is
+        // only ticked ✓), so the order is pure A–Z.
+        List<String[]> langs = new ArrayList<>(LangStore.pickerLanguages(this));
+        langs.sort((a, b) -> SortOrders.azCompare(a[1], b[1]));
         String current = ChannelStore.getUiLanguage(this);
         ListView list = new ListView(this);
         list.setBackgroundColor(Color.rgb(16, 16, 20));

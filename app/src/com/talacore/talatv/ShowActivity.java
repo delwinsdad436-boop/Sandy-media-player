@@ -78,7 +78,7 @@ public class ShowActivity extends Activity {
         posterView.setScaleType(ImageView.ScaleType.CENTER_CROP);
         posterView.setBackground(Sanctuary.posterFrame(this));
         Sanctuary.roundClip(this, posterView, Sanctuary.TILE_RADIUS_DP);
-        header.addView(posterView, new LinearLayout.LayoutParams(dp(104), dp(146)));
+        header.addView(posterView, new LinearLayout.LayoutParams(dp(104), dp(156)));
         if (preImage != null) ImageCache.load(this, preImage, posterView);
 
         LinearLayout headText = new LinearLayout(this);
@@ -87,12 +87,12 @@ public class ShowActivity extends Activity {
         nameView = new TextView(this);
         nameView.setText(preName == null ? "" : preName);
         nameView.setTextColor(Sanctuary.INK);
-        nameView.setTextSize(20);
+        nameView.setTextSize(Sanctuary.TEXT_PAGE_TITLE);
         nameView.setTypeface(nameView.getTypeface(), Typeface.BOLD);
         headText.addView(nameView);
         metaView = new TextView(this);
         metaView.setTextColor(Sanctuary.MUTED);
-        metaView.setTextSize(13);
+        metaView.setTextSize(Sanctuary.TEXT_META);
         headText.addView(metaView);
         watchlistBtn = new Button(this);
         Sanctuary.styleButton(this, watchlistBtn, false);
@@ -104,7 +104,8 @@ public class ShowActivity extends Activity {
 
         summaryView = new TextView(this);
         summaryView.setTextColor(Sanctuary.BODY);
-        summaryView.setTextSize(13);
+        summaryView.setTextSize(Sanctuary.TEXT_BODY);
+        summaryView.setLineSpacing(0f, 1.4f);
         summaryView.setMaxLines(5);
         summaryView.setPadding(0, dp(8), 0, 0);
         root.addView(summaryView);
@@ -189,7 +190,7 @@ public class ShowActivity extends Activity {
 
         statusView = new TextView(this);
         statusView.setTextColor(Sanctuary.MUTED);
-        statusView.setTextSize(12);
+        statusView.setTextSize(Sanctuary.TEXT_META);
         root.addView(statusView);
 
         setContentView(root);
@@ -331,7 +332,7 @@ public class ShowActivity extends Activity {
                 main.setTextSize(15);
                 sub = new TextView(ShowActivity.this);
                 sub.setTextColor(Sanctuary.SUB);
-                sub.setTextSize(12);
+                sub.setTextSize(Sanctuary.TEXT_META);
                 ll.addView(main);
                 ll.addView(sub);
             }

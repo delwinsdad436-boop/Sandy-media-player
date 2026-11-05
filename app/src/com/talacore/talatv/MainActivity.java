@@ -13,6 +13,7 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
@@ -70,12 +71,29 @@ public class MainActivity extends Activity {
     private final List<Object> displayRows = new ArrayList<>();
     /** Channels only, in display order - the play queue order. */
     private final List<M3uParser.Channel> displayChannels = new ArrayList<>();
+    /** URLs shown in the set-aside section (item 13): scan-proven-dead
+     *  channels set aside at the bottom of the default display, still
+     *  tappable. Rebuilt with every rebuildDisplay; the adapter reads
+     *  it to print each aside row's why from its scan record. */
+    private final Set<String> setAsideUrls = new java.util.HashSet<>();
 
     private Set<String> favorites;
 
     private TextView countView;
     private TextView statusView;
     private ProgressBar progress;
+    // Browse mode (fixpass-0200, item 2): when ON, the whole chrome
+    // container (everything above the channel list) and the status
+    // line collapse so the list gets the full screen height; only
+    // the slim browse bar and the list (plus Her Channels) remain.
+    private boolean browseMode = false;
+    private LinearLayout chrome;
+    private Button browseBtn;
+    private TextView browseCountView;
+    // Her Channels (fixpass-0200, item 6): the favorites rail pinned
+    // at the top of the channel list area.
+    private LinearLayout favRailBox;
+    private LinearLayout favTiles;
     private EditText searchBox;
     private Spinner genreSpinner, languageSpinner, countrySpinner;
     private ListView listView;
@@ -98,8 +116,24 @@ public class MainActivity extends Activity {
     private boolean verifying = false;
     private boolean probingTap = false;
     private boolean langFacetTouched = false;
+    // Sort (fixpass-0200, item 12): the standing Live TV sort,
+    // persisted in this activity's preferences the way Home's
+    // facet_sort persists (an ordinal int, bounds-checked on
+    // restore). DEFAULT is the standing surf/health order —
+    // nobody's list moves unless they ask.
+    private SortOrders.Mode liveSort = SortOrders.Mode.DEFAULT;
+    private Button sortBtn;
     /** Filed guide data for now/next lines (v0.11.0); null until loaded. */
     private volatile GuideModel.GuideData guideData;
+    // Staged warm-up proof (fixpass-0200, item 14): the favorites
+    // pass runs at most once per screen open (this activity
+    // instance), and prove-on-view queues each display section at
+    // most once per display rebuild. Section identity comes from
+    // the header rows of displayRows itself — the same list
+    // rebuildDisplay built — never from a second grouping.
+    private boolean favoritesWarmStarted = false;
+    private final Set<String> sectionProofQueued = new java.util.HashSet<>();
+    private String visibleSectionKey = null;
 
     private List<String> genreChoices = new ArrayList<>();
     private List<String> languageChoices = new ArrayList<>();
@@ -113,6 +147,14 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         favorites = ChannelStore.getFavorites(this);
         NameStore.ensureLoaded(this);
+        // Sort (item 12): restore the standing sort, Home's
+        // facet_sort pattern — an ordinal int in this activity's
+        // own preferences, bounds-checked before it is trusted.
+        int sortOrd = getPreferences(MODE_PRIVATE).getInt("live_sort", 0);
+        SortOrders.Mode[] sortModes = SortOrders.Mode.values();
+        if (sortOrd >= 0 && sortOrd < sortModes.length) {
+            liveSort = sortModes[sortOrd];
+        }
 
         // v0.17.0 THE SANCTUARY LAYOUT: the sanctuary ground.
         LinearLayout root = new LinearLayout(this);
@@ -121,22 +163,50 @@ public class MainActivity extends Activity {
         int pad = dp(Sanctuary.PAGE_PAD_DP);
         root.setPadding(pad, pad, pad, pad);
 
+        // The slim browse bar (item 2): always visible, so the
+        // toggle can bring the full layout back. In browse mode it
+        // also carries the channel count.
+        LinearLayout browseBar = new LinearLayout(this);
+        browseBar.setOrientation(LinearLayout.HORIZONTAL);
+        browseBar.setGravity(Gravity.CENTER_VERTICAL);
+        browseBtn = new Button(this);
+        browseBtn.setText(LangStore.tr(this, "live_browse_btn"));
+        browseBtn.setContentDescription(LangStore.tr(this, "live_browse_btn"));
+        Sanctuary.styleButton(this, browseBtn, false);
+        browseBtn.setOnClickListener(v -> setBrowseMode(!browseMode));
+        browseBar.addView(browseBtn);
+        browseCountView = new TextView(this);
+        browseCountView.setTextColor(Sanctuary.MUTED);
+        browseCountView.setTextSize(Sanctuary.TEXT_META);
+        browseCountView.setPadding(dp(12), 0, 0, 0);
+        browseCountView.setVisibility(View.GONE);
+        browseBar.addView(browseCountView);
+        root.addView(browseBar);
+
+        // Everything that is not the list lives in this one chrome
+        // container, so browse mode is a single GONE/VISIBLE flip
+        // and restoring it restores every child's own visibility
+        // (the kept banner, the progress bar) exactly as it was.
+        chrome = new LinearLayout(this);
+        chrome.setOrientation(LinearLayout.VERTICAL);
+        root.addView(chrome);
+
         LinearLayout titleRow = new LinearLayout(this);
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = new TextView(this);
         title.setText(LangStore.tr(this, "live_title"));
-        title.setTextSize(22);
+        title.setTextSize(Sanctuary.TEXT_PAGE_TITLE);
         Sanctuary.goldText(title);
         title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
         titleRow.addView(title, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         countView = new TextView(this);
         countView.setTextColor(Sanctuary.MUTED);
-        countView.setTextSize(13);
+        countView.setTextSize(Sanctuary.TEXT_META);
         countView.setPadding(dp(12), 0, 0, 0);
         titleRow.addView(countView);
-        root.addView(titleRow);
+        chrome.addView(titleRow);
 
         // The kept place (v0.5.0, item 8): the last live channel's
         // buffer survived the app closing — one tap returns to it and
@@ -145,7 +215,7 @@ public class MainActivity extends Activity {
         keptBanner.setVisibility(View.GONE);
         Sanctuary.styleButton(this, keptBanner, false);
         keptBanner.setOnClickListener(v -> openKeptChannel());
-        root.addView(keptBanner, new LinearLayout.LayoutParams(
+        chrome.addView(keptBanner, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         // Search, visibly a search (v0.6.0, field note #2e): a
@@ -173,7 +243,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams searchRowLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         searchRowLp.setMargins(0, dp(6), 0, dp(6));
-        root.addView(searchRow, searchRowLp);
+        chrome.addView(searchRow, searchRowLp);
 
         LinearLayout controlRow = new LinearLayout(this);
         controlRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -199,7 +269,30 @@ public class MainActivity extends Activity {
         guideBtn.setOnClickListener(v -> startActivity(
                 new Intent(this, GuideActivity.class)));
         controlRow.addView(guideBtn);
-        root.addView(controlRow);
+        // The Record door (fixpass-0200, item 3): a hand-set timer
+        // recording, straight into SetTimerActivity with NO extras
+        // — its no-extras entry IS the pick-a-channel-by-hand flow.
+        // (Live TV has no standing selected/highlighted channel to
+        // prefill from, so no X_* extras are passed.)
+        Button recordBtn = new Button(this);
+        recordBtn.setText(LangStore.tr(this, "live_record_btn"));
+        recordBtn.setContentDescription(LangStore.tr(this, "live_record_btn"));
+        Sanctuary.styleButton(this, recordBtn, false);
+        recordBtn.setOnClickListener(v -> startActivity(
+                new Intent(this, SetTimerActivity.class)));
+        controlRow.addView(recordBtn);
+        // The Sort control (fixpass-0200, item 12): a cycle button
+        // in the control row, beside the facet furniture — one tap
+        // steps Default → By number → A–Z → Default, and the label
+        // always shows the standing mode. A cycle button, not a
+        // dialog: three modes, one tap each, the standing pick
+        // readable at a glance without opening anything.
+        sortBtn = new Button(this);
+        Sanctuary.styleButton(this, sortBtn, false);
+        sortBtn.setOnClickListener(v -> cycleLiveSort());
+        updateSortButton();
+        controlRow.addView(sortBtn);
+        chrome.addView(controlRow);
 
         LinearLayout facetRow = new LinearLayout(this);
         facetRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -209,7 +302,7 @@ public class MainActivity extends Activity {
         countrySpinner = new Spinner(this);
         facetRow.addView(countrySpinner, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(facetRow);
+        chrome.addView(facetRow);
 
         // Link health (v0.3.0): hide the links already proven dead, and
         // a Verify action that probes the visible set and badges it.
@@ -242,45 +335,95 @@ public class MainActivity extends Activity {
         Sanctuary.styleButton(this, scanBtn, false);
         scanBtn.setOnClickListener(v -> startScan());
         healthRow.addView(scanBtn);
-        root.addView(healthRow);
+        chrome.addView(healthRow);
 
         scanLine = new TextView(this);
         scanLine.setTextColor(Sanctuary.SUB);
-        scanLine.setTextSize(12);
+        scanLine.setTextSize(Sanctuary.TEXT_META);
         scanLine.setPadding(dp(2), dp(2), 0, 0);
-        root.addView(scanLine);
+        chrome.addView(scanLine);
 
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setIndeterminate(true);
         progress.setVisibility(View.GONE);
         progress.setProgressTintList(ColorStateList.valueOf(Sanctuary.GOLD));
         progress.setIndeterminateTintList(ColorStateList.valueOf(Sanctuary.GOLD));
-        root.addView(progress, new LinearLayout.LayoutParams(
+        chrome.addView(progress, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(6)));
 
         // Service / section tile rows (v0.12.1) — peers over the list.
         TextView svcLabel = new TextView(this);
         svcLabel.setText(LangStore.tr(this, "live_by_service"));
         svcLabel.setTextColor(Sanctuary.MUTED);
-        svcLabel.setTextSize(12);
-        root.addView(svcLabel);
+        svcLabel.setTextSize(Sanctuary.TEXT_META);
+        chrome.addView(svcLabel);
         serviceTiles = new LinearLayout(this);
         serviceTiles.setOrientation(LinearLayout.HORIZONTAL);
         android.widget.HorizontalScrollView svcScroll =
                 new android.widget.HorizontalScrollView(this);
         svcScroll.addView(serviceTiles);
-        root.addView(svcScroll);
+        chrome.addView(svcScroll);
         TextView secLabel = new TextView(this);
         secLabel.setText(LangStore.tr(this, "live_by_section"));
         secLabel.setTextColor(Sanctuary.MUTED);
-        secLabel.setTextSize(12);
-        root.addView(secLabel);
+        secLabel.setTextSize(Sanctuary.TEXT_META);
+        chrome.addView(secLabel);
         sectionTiles = new LinearLayout(this);
         sectionTiles.setOrientation(LinearLayout.HORIZONTAL);
         android.widget.HorizontalScrollView secScroll =
                 new android.widget.HorizontalScrollView(this);
         secScroll.addView(sectionTiles);
-        root.addView(secScroll);
+        chrome.addView(secScroll);
+
+        // Her Channels (item 6): the favorites as a pinned rail at
+        // the TOP of the channel list area — standing over the full
+        // list, not only behind the favorites facet. A horizontal
+        // scroll of Sanctuary chips (PosterRail is poster geometry
+        // for image tiles; channels are text, so a plain chip rail
+        // in the same style fits). It does not render at all when
+        // there are no favorites (see rebuildFavRail). It sits
+        // OUTSIDE the chrome container, so it stays with the list
+        // in browse mode too.
+        favRailBox = new LinearLayout(this);
+        favRailBox.setOrientation(LinearLayout.VERTICAL);
+        favRailBox.setVisibility(View.GONE);
+        // Daily-door weight (fixpass-0200, item 13): Her Channels is
+        // where she LIVES — the full list below is where she goes by
+        // choice. So the rail is not a 12sp muted caption over chips:
+        // it is a labeled panel block at the very top of the display
+        // (above the first section header, since section headers live
+        // inside the list under it), gold and bold at title-adjacent
+        // size, with a plain-words line saying what the door is for.
+        // Same Sanctuary idiom, no new styling system — the restyle
+        // hand refines from here. Empty rail: the whole block,
+        // label and hint included, stays absent (rebuildFavRail).
+        favRailBox.setBackgroundColor(Sanctuary.PANEL);
+        favRailBox.setPadding(dp(10), dp(8), dp(10), dp(8));
+        TextView favLabel = new TextView(this);
+        favLabel.setText(LangStore.tr(this, "live_her_channels"));
+        Sanctuary.goldText(favLabel);
+        favLabel.setTextSize(18);
+        favLabel.setTypeface(favLabel.getTypeface(),
+                android.graphics.Typeface.BOLD);
+        favLabel.setContentDescription(LangStore.tr(this, "live_her_channels"));
+        favRailBox.addView(favLabel);
+        TextView favHint = new TextView(this);
+        favHint.setText(trOr("live_her_channels_hint",
+                "Your favorite channels — tap one to watch"));
+        favHint.setTextColor(Sanctuary.MUTED);
+        favHint.setTextSize(Sanctuary.TEXT_META);
+        favRailBox.addView(favHint);
+        favTiles = new LinearLayout(this);
+        favTiles.setOrientation(LinearLayout.HORIZONTAL);
+        android.widget.HorizontalScrollView favScroll =
+                new android.widget.HorizontalScrollView(this);
+        favScroll.addView(favTiles);
+        favRailBox.addView(favScroll);
+        LinearLayout.LayoutParams favRailLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        favRailLp.setMargins(0, dp(6), 0, dp(6));
+        root.addView(favRailBox, favRailLp);
 
         listView = new ListView(this);
         listView.setBackgroundColor(Sanctuary.GROUND);
@@ -293,7 +436,7 @@ public class MainActivity extends Activity {
 
         statusView = new TextView(this);
         statusView.setTextColor(Sanctuary.TEAL);
-        statusView.setTextSize(12);
+        statusView.setTextSize(Sanctuary.TEXT_META);
         root.addView(statusView);
 
         setContentView(root);
@@ -325,6 +468,19 @@ public class MainActivity extends Activity {
                 playChannel((M3uParser.Channel) row);
             }
         });
+        // Prove-on-view (item 14b): the scroll position IS the
+        // entry signal — when the first visible row stands in a
+        // section she has not stood in during this display, that
+        // section's stale/unproven members are queued for proof.
+        listView.setOnScrollListener(new AbsListView.OnScrollListener() {
+            @Override public void onScrollStateChanged(
+                    AbsListView view, int scrollState) { }
+            @Override public void onScroll(AbsListView view,
+                    int firstVisibleItem, int visibleItemCount,
+                    int totalItemCount) {
+                maybeProveSectionAt(firstVisibleItem);
+            }
+        });
 
         List<M3uParser.Channel> cached = ChannelStore.loadCache(this);
         if (cached != null) {
@@ -333,10 +489,11 @@ public class MainActivity extends Activity {
         } else {
             fetchAll(true);
         }
-        // Auto-fresh (v0.4.0): stale verdicts quietly re-verify in the
-        // background — favorites + the surf lists first. Also triggered
-        // from the boot screen; the guard makes double-calls harmless.
-        triggerFreshVerify();
+        // Staged warm-up (item 14) is triggered from
+        // afterChannelsLoaded, not here: the favorites-first pass
+        // needs the channels loaded before it can pick the
+        // favorites out of them. (Auto-fresh is also triggered
+        // from the boot screen; its guards make that harmless.)
     }
 
     private void triggerFreshVerify() {
@@ -348,6 +505,97 @@ public class MainActivity extends Activity {
                         rebuildDisplay();
                     }
                 });
+    }
+
+    // ------------------------------------------------ staged warm-up
+    // fixpass-0200, item 14 (James's design): NOT a total open-time
+    // sweep. (a) Her Channels proven FIRST at open; (b) each Live
+    // TV section proven as she enters it, screenful-scale; (c) the
+    // slow polite background refresh (FreshVerify.maybeRun,
+    // unchanged) works through the rest over time; (d) tap-time
+    // exhaustive walk + player healing stays the final word.
+
+    /**
+     * (a) Favorites first at open — fired from afterChannelsLoaded,
+     * the moment the channels exist to pick favorites from. At
+     * most once per screen open (this instance's flag), and the
+     * general FreshVerify is chained AFTER it: when the favorites
+     * pass was queued, the general refresh is triggered from its
+     * completion listener; when it was not queued (auto-fresh off,
+     * or a pass already in flight from another open), the general
+     * refresh is triggered directly. Either way the favorites pass
+     * is submitted to FreshVerify's warm thread before the general
+     * refresh is — and it cannot be starved by the general queue's
+     * 250-cap or 30-minute interval, which do not govern it (see
+     * FreshVerify.runFavoritesFirst).
+     */
+    private void triggerWarmUpProof() {
+        if (favoritesWarmStarted) {
+            triggerFreshVerify();
+            return;
+        }
+        favoritesWarmStarted = true;
+        final List<M3uParser.Channel> snapshot =
+                new ArrayList<>(allChannels);
+        boolean queued = FreshVerify.runFavoritesFirst(this,
+                () -> snapshot,
+                n -> {
+                    if (isFinishing()) return;
+                    if (n > 0) adapter.notifyDataSetChanged();
+                    triggerFreshVerify();
+                });
+        if (!queued) triggerFreshVerify();
+    }
+
+    /**
+     * (b) Prove-on-view: queue a bounded proof pass for the
+     * section standing at display row {@code pos}, when that
+     * section is newly entered. "Section" is derived from
+     * displayRows itself — the sectioned list rebuildDisplay
+     * built: a String row is a section header, and a channel row
+     * belongs to the nearest header above it. Flat displays
+     * (search, a single facet cut) have no headers and queue
+     * nothing — there is no section to enter. Each section is
+     * queued at most once per display rebuild (the queued set is
+     * reset in rebuildDisplay); FreshVerify re-filters staleness
+     * when the pass actually runs and caps it at
+     * FreshVerify.SECTION_PROOF_CAP (24 — roughly two screens of
+     * rows, the warm-up hand's stated pick). rebuildDisplay also
+     * calls this for row 0, so the FIRST section is proven when
+     * the display first builds — she is looking at it.
+     */
+    private void maybeProveSectionAt(int pos) {
+        if (pos < 0 || pos >= displayRows.size()) return;
+        int headerPos = -1;
+        for (int i = pos; i >= 0; i--) {
+            if (displayRows.get(i) instanceof String) {
+                headerPos = i;
+                break;
+            }
+        }
+        if (headerPos < 0) return;
+        // addSection decorates header rows with their count
+        // ("News  (42)"); the section key is the bare header text.
+        String header = (String) displayRows.get(headerPos);
+        String key = header.replaceAll("\\s+\\(\\d+\\)$", "");
+        if (key.equals(visibleSectionKey)) return;
+        visibleSectionKey = key;
+        if (!sectionProofQueued.add(key)) return;
+        List<M3uParser.Channel> members = new ArrayList<>();
+        for (int i = headerPos + 1; i < displayRows.size(); i++) {
+            Object row = displayRows.get(i);
+            if (row instanceof String) break;
+            if (row instanceof M3uParser.Channel) {
+                members.add((M3uParser.Channel) row);
+            }
+        }
+        if (members.isEmpty()) return;
+        final List<M3uParser.Channel> section = members;
+        FreshVerify.runSectionProof(this, () -> section, n -> {
+            if (n > 0 && !isFinishing()) {
+                adapter.notifyDataSetChanged();
+            }
+        });
     }
 
     /**
@@ -405,6 +653,186 @@ public class MainActivity extends Activity {
 
     private int dp(int v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /**
+     * A string by key, with the English text carried here as the
+     * fallback until the key lands in UiStrings (the coordinator
+     * adds keys centrally; UiStrings.lookup returns the key itself
+     * for a key it does not know yet, and a raw key is never shown
+     * to Sandy). Once the key exists, its table/pack text wins.
+     */
+    private String trOr(String key, String englishFallback) {
+        String v = LangStore.tr(this, key);
+        return (v == null || v.isEmpty() || v.equals(key))
+                ? englishFallback : v;
+    }
+
+    // ------------------------------------------------------------- sort
+
+    /** The standing sort's own label, from the sort string keys. */
+    private String liveSortLabel() {
+        switch (liveSort) {
+            case NUMBER: return LangStore.tr(this, "sort_number");
+            case AZ: return LangStore.tr(this, "sort_az");
+            default: return LangStore.tr(this, "sort_default");
+        }
+    }
+
+    private void updateSortButton() {
+        if (sortBtn == null) return;
+        String label = LangStore.tr(this, "facet_sort") + ": " + liveSortLabel();
+        sortBtn.setText(label);
+        sortBtn.setContentDescription(label);
+    }
+
+    /** One tap steps the cycle and files the pick, so the chosen
+     *  sort persists the way favorites persist — standing across
+     *  opens until the viewer changes it. */
+    private void cycleLiveSort() {
+        SortOrders.Mode[] modes = SortOrders.Mode.values();
+        liveSort = modes[(liveSort.ordinal() + 1) % modes.length];
+        getPreferences(MODE_PRIVATE).edit()
+                .putInt("live_sort", liveSort.ordinal()).apply();
+        updateSortButton();
+        rebuildDisplay();
+    }
+
+    // ------------------------------------------------------- browse mode
+
+    private void setBrowseMode(boolean on) {
+        browseMode = on;
+        applyBrowseMode();
+    }
+
+    /**
+     * Apply the standing browse flag to the views. Called when the
+     * toggle is tapped AND at the end of every rebuildDisplay, so
+     * the mode survives list rebuilds. Hiding the single chrome
+     * container hides every non-list element above the list at
+     * once; showing it again restores each child's own visibility
+     * exactly (the kept banner and progress bar keep whatever
+     * visibility they had). The status line under the list hides
+     * too; the browse bar and the list stay.
+     */
+    private void applyBrowseMode() {
+        if (chrome != null) {
+            chrome.setVisibility(browseMode ? View.GONE : View.VISIBLE);
+        }
+        if (statusView != null) {
+            statusView.setVisibility(browseMode ? View.GONE : View.VISIBLE);
+        }
+        if (browseBtn != null) {
+            String key = browseMode ? "live_browse_exit_btn" : "live_browse_btn";
+            browseBtn.setText(LangStore.tr(this, key));
+            browseBtn.setContentDescription(LangStore.tr(this, key));
+        }
+        if (browseCountView != null) {
+            browseCountView.setVisibility(browseMode ? View.VISIBLE : View.GONE);
+            browseCountView.setText(displayChannels.size() + " "
+                    + LangStore.tr(this, "live_channels_suffix"));
+        }
+    }
+
+    /** Back exits browse mode first; only then does it leave Live TV. */
+    @Override
+    public void onBackPressed() {
+        if (browseMode) {
+            setBrowseMode(false);
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    // ------------------------------------------------------- Her Channels
+
+    /**
+     * Rebuild the pinned favorites rail from the loaded list, in
+     * loaded-list order, de-duplicated by URL. Favorite membership
+     * is re-read from ChannelStore so star toggles and rail
+     * long-presses are reflected at once. No favorites: the rail
+     * does not render at all.
+     */
+    private void rebuildFavRail() {
+        if (favRailBox == null || favTiles == null) return;
+        favorites = ChannelStore.getFavorites(this);
+        favTiles.removeAllViews();
+        Set<String> seen = new java.util.HashSet<>();
+        int shown = 0;
+        for (M3uParser.Channel c : allChannels) {
+            if (c == null || c.url == null || !favorites.contains(c.url)) continue;
+            if (!seen.add(c.url)) continue;
+            final M3uParser.Channel ch = c;
+            Button b = new Button(this);
+            String label = ch.displayName();
+            if (ch.group != null && !ch.group.trim().isEmpty()
+                    && !"Undefined".equalsIgnoreCase(ch.group.trim())) {
+                label += " · " + ch.group.trim();
+            }
+            b.setText("★ " + label);
+            b.setContentDescription(label);
+            Sanctuary.styleChip(this, b, false);
+            // Tap plays through the exact path a list tap takes.
+            b.setOnClickListener(v -> playChannel(ch));
+            // Long-press removes the favorite; the rail and the
+            // list (facet + stars) refresh from the same rebuild.
+            b.setOnLongClickListener(v -> {
+                ChannelStore.setFavorite(this, ch.url, false);
+                favorites = ChannelStore.getFavorites(this);
+                rebuildDisplay();
+                return true;
+            });
+            favTiles.addView(b);
+            shown++;
+        }
+        favRailBox.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    // ------------------------------------------------- search ranking
+
+    /**
+     * Best-match-first ordering for a channel search (item 1, Live
+     * TV side): exact name, then starts-with, then a word-boundary
+     * contains, then any contains. List.sort is stable, and the
+     * comparator looks at the tier only, so channels inside one
+     * tier keep their current list order. Which channels match is
+     * NOT decided here — ChannelNames.matchesQuery still does that;
+     * this only orders the matches. (No SearchRank.java exists in
+     * the tree, so this is the small private helper the task names
+     * as the alternative.)
+     */
+    private static void rankBySearchQuery(List<M3uParser.Channel> channels,
+                                          String qLowerTrimmed) {
+        if (channels == null || qLowerTrimmed == null
+                || qLowerTrimmed.isEmpty()) return;
+        channels.sort((a, b) -> Integer.compare(
+                searchTier(a, qLowerTrimmed), searchTier(b, qLowerTrimmed)));
+    }
+
+    private static int searchTier(M3uParser.Channel c, String q) {
+        int tier = searchTierForName(c.displayName(), q);
+        if (c.name != null) {
+            tier = Math.min(tier, searchTierForName(c.name, q));
+        }
+        return tier;
+    }
+
+    /** 0 exact, 1 starts-with, 2 word-boundary contains, 3 contains, 4 no name match. */
+    private static int searchTierForName(String name, String q) {
+        if (name == null) return 4;
+        String n = name.toLowerCase(Locale.US).trim();
+        if (n.isEmpty()) return 4;
+        if (n.equals(q)) return 0;
+        if (n.startsWith(q)) return 1;
+        int idx = n.indexOf(q);
+        if (idx < 0) return 4;
+        while (idx >= 0) {
+            if (idx == 0 || !Character.isLetterOrDigit(n.charAt(idx - 1))) {
+                return 2;
+            }
+            idx = n.indexOf(q, idx + 1);
+        }
+        return 3;
     }
 
     // ------------------------------------------------------------- loading
@@ -536,6 +964,12 @@ public class MainActivity extends Activity {
     private void afterChannelsLoaded(String status) {
         statusView.setTextColor(Sanctuary.TEAL);
         statusView.setText(status);
+        // Item 14(a) FIRST, before facets/tiles/rebuild below —
+        // rebuildFacets can itself trigger a rebuildDisplay (the
+        // facet spinners), whose first-section prove-on-view pass
+        // (item 14b) must not reach the warm thread ahead of Her
+        // Channels. allChannels is already set by both callers.
+        triggerWarmUpProof();
         rebuildFacets();
         rebuildTiles();
         rebuildDisplay();
@@ -711,6 +1145,10 @@ public class MainActivity extends Activity {
     private void rebuildDisplay() {
         displayRows.clear();
         displayChannels.clear();
+        // Item 14(b): a new display is a new standing — section
+        // proof queues afresh for the sections of THIS display.
+        sectionProofQueued.clear();
+        visibleSectionKey = null;
         String genre = chosen(genreSpinner, genreChoices);
         if (genre == null) genre = ALL_GENRES;
         String lang = chosen(languageSpinner, languageChoices);
@@ -723,17 +1161,34 @@ public class MainActivity extends Activity {
         boolean allLangs = ALL_LANGS.equals(lang);
         boolean allCountries = ALL_COUNTRIES.equals(country);
         boolean workingOnly = workingOnlyBox != null && workingOnlyBox.isChecked();
+        boolean tileActive = !activeService.isEmpty() || !activeSection.isEmpty();
+        // THE DEFAULT DISPLAY (fixpass-0200, item 13): no search
+        // query, no facet picked, no tile filter, not favorites —
+        // the primary-section list with the set-aside section at
+        // its bottom. Every other mode keeps its own shape below.
+        boolean defaultDisplay = allGenres && allLangs && allCountries
+                && q.isEmpty() && !favMode && !tileActive;
 
         List<M3uParser.Channel> filtered = new ArrayList<>();
+        List<M3uParser.Channel> setAside = new ArrayList<>();
+        setAsideUrls.clear();
         int hiddenDead = 0;
-        int scanRemoved = 0;
+        int scanSetAside = 0;
         for (M3uParser.Channel c : allChannels) {
-            // v0.17.0 THE CHANNEL SCAN: a link the scan convicted
-            // terminally dead is OFF the shelf — not badged, not
-            // greyed, gone, in every mode (so the counts below stay
-            // verified counts: these never enter them).
+            // THE CHAFF ASIDE (fixpass-0200, item 13; James:
+            // "separate the chaff from the wheat"): a link the scan
+            // proved dead is SET ASIDE, never deleted and never
+            // mixed into the wheat. In the default display it is
+            // collected here and shown in its own final section,
+            // still tappable — the player's walk is the final word.
+            // In every other mode (search, facets, tiles, language,
+            // favorites) it stays off that display exactly as
+            // before, and the count below still says so. The scan's
+            // verdict logic itself is untouched — this only decides
+            // where a convicted link is PRESENTED.
             if (ScanStore.verdictOf(this, c.url) == ChannelScan.V_DEAD) {
-                scanRemoved++;
+                scanSetAside++;
+                if (defaultDisplay) setAside.add(c);
                 continue;
             }
             if (favMode && !favorites.contains(c.url)) continue;
@@ -781,11 +1236,39 @@ public class MainActivity extends Activity {
             return a.displayName().compareToIgnoreCase(b.displayName());
         };
         Comparator<M3uParser.Channel> byName = byHealthThenName;
+        // SORT (fixpass-0200, item 12): the standing sort composes
+        // at the same point the surf/health ordering is applied.
+        // DEFAULT keeps byName — today's order, exactly. NUMBER /
+        // A–Z replace it inside each section and in the flat facet
+        // list below (section headers keep their own standing
+        // order: home country first in a language view, the rest
+        // A→Z; primary sections in LiveGroups' standing order).
+        // SEARCH is not ordered here at all: while a query
+        // is in the box, the search ranking wins and liveSort does
+        // not apply. Browse mode only changes layout, and the Her
+        // Channels rail follows favorites/list order — neither is
+        // touched by the sort.
+        Comparator<M3uParser.Channel> displayOrder =
+                liveSort == SortOrders.Mode.DEFAULT
+                        ? byName
+                        : SortOrders.comparator(liveSort,
+                                c -> c.displayName());
         boolean unfiltered = allGenres && allLangs && allCountries && q.isEmpty();
+        int setAsideShown = 0;
         if (!q.isEmpty()) {
             // SEARCH (field note #2e): one flat result list — the
-            // person asked for matches, not rooms.
-            filtered.sort(byName);
+            // person asked for matches, not rooms. Best match first
+            // (fixpass-0200, item 1): exact > starts-with >
+            // word-boundary contains > contains, stable within a
+            // tier so the current list order stands inside it.
+            // The standing sort mode does NOT apply here — the
+            // search ranking wins while a query is in the box.
+            // Scan-dead channels are NOT in these results: they
+            // were set aside at collection above and search keeps
+            // today's behavior (out of the results, count said in
+            // the status line) — the aside lives only in the
+            // default display (item 13).
+            rankBySearchQuery(filtered, q);
             for (M3uParser.Channel c : filtered) {
                 displayRows.add(c);
                 displayChannels.add(c);
@@ -805,49 +1288,120 @@ public class MainActivity extends Activity {
             Collections.sort(cs, String.CASE_INSENSITIVE_ORDER);
             if (!home.isEmpty() && byCountry.containsKey(home)) {
                 addSection(home + " — " + LangStore.tr(this, "live_home_tag"),
-                        byCountry.get(home), byName);
+                        byCountry.get(home), displayOrder);
                 cs.remove(home);
             }
             for (String co : cs) {
                 addSection(co.isEmpty() ? NOT_SPECIFIED : co,
-                        byCountry.get(co), byName);
+                        byCountry.get(co), displayOrder);
             }
-        } else if (unfiltered) {
-            // DEFAULT BROWSING: genre ROOMS (field note #2a) —
-            // header rows between alphabetical groups, as since 0.5.0.
-            Map<String, List<M3uParser.Channel>> byGroup = new LinkedHashMap<>();
-            for (M3uParser.Channel c : filtered) {
-                byGroup.computeIfAbsent(c.group, k -> new ArrayList<>()).add(c);
+        } else if (defaultDisplay) {
+            // DEFAULT BROWSING (fixpass-0200, item 13): PRIMARY-
+            // SECTION rooms — each channel in EXACTLY ONE section,
+            // its first section in LiveGroups.sectionsOf order,
+            // else "Other" (LiveGroups.primarySectionOf). Sections
+            // stand in LiveGroups' standing order (News, Sports,
+            // Movies, Kids, Music, then the rest A–Z, "Other" last);
+            // inside a section the standing sort (displayOrder)
+            // applies through addSection, as in every sectioned
+            // view. This replaces the old genre rooms (by playlist
+            // group) for the default display only. Browse mode
+            // shows this same display — it only collapses chrome.
+            Map<String, List<M3uParser.Channel>> bySection =
+                    LiveGroups.groupByPrimarySection(filtered);
+            for (Map.Entry<String, List<M3uParser.Channel>> e
+                    : bySection.entrySet()) {
+                addSection(e.getKey(), e.getValue(), displayOrder);
             }
-            List<String> gs = new ArrayList<>(byGroup.keySet());
-            Collections.sort(gs, String.CASE_INSENSITIVE_ORDER);
-            for (String g : gs) {
-                addSection(g, byGroup.get(g), byName);
+            // THE SET-ASIDE, last of all — after "Other", never
+            // above the wheat. Same header-row mechanism/styling
+            // as every other section; rows are ordinary channel
+            // rows (tappable — tap plays through playChannel, and
+            // a channel that came back will play), marked in
+            // setAsideUrls so the adapter prints each row's why
+            // from its scan record.
+            if (!setAside.isEmpty()) {
+                for (M3uParser.Channel c : setAside) setAsideUrls.add(c.url);
+                addSection(trOr("live_set_aside",
+                        "Set aside — not playing when checked"),
+                        setAside, displayOrder);
+                setAsideShown = setAside.size();
             }
         } else {
-            // A facet is picked (one genre, one country, favorites):
-            // that IS the room — flat inside it.
-            filtered.sort(byName);
+            // A facet is picked (one genre, one country, favorites)
+            // or a service/section tile is active over an otherwise
+            // default view: that single cut IS the room — flat
+            // inside it (item 13: the sectioned display belongs to
+            // the unfiltered default only).
+            filtered.sort(displayOrder);
             for (M3uParser.Channel c : filtered) {
                 displayRows.add(c);
                 displayChannels.add(c);
             }
         }
         adapter.notifyDataSetChanged();
+        // Her Channels follows every rebuild (star toggles, facet
+        // and search changes, fresh loads), and browse mode is
+        // re-applied so a rebuild can never resurrect the chrome.
+        rebuildFavRail();
+        applyBrowseMode();
+        // Item 14(b): the FIRST section of a fresh display is the
+        // section she is looking at — queue its proof now; later
+        // sections queue as scrolling enters them.
+        maybeProveSectionAt(0);
         if (!loading) {
             statusView.setTextColor(Sanctuary.MUTED);
             if (favMode && displayChannels.isEmpty()) {
                 statusView.setText("No favorites yet — tap the ☆ on any channel to keep it here.");
-            } else if (!unfiltered || workingOnly || scanRemoved > 0) {
-                statusView.setText(displayChannels.size() + " channels match — "
+            } else if (!unfiltered || workingOnly || scanSetAside > 0) {
+                // The match count is the WHEAT count: channels in
+                // the set-aside section are on the display (and in
+                // displayChannels / the play queue) but they are
+                // not matches — they are said separately, in plain
+                // words, as set aside (item 13: the status line
+                // keeps saying the set-aside count).
+                statusView.setText((displayChannels.size() - setAsideShown)
+                        + " channels match — "
                         + genre + " · " + lang + " · " + country
                         + (q.isEmpty() ? "" : " · “" + q + "”")
                         + (workingOnly && hiddenDead > 0
                             ? " · " + hiddenDead + " dead hidden" : "")
-                        + (scanRemoved > 0
-                            ? " · " + scanRemoved + " removed by scan" : ""));
+                        + (scanSetAside > 0
+                            ? " · " + scanSetAside + " set aside by scan" : ""));
             }
         }
+    }
+
+    /**
+     * The WHY on a set-aside row (item 13), in short plain words,
+     * from the scan evidence that actually exists — nothing
+     * invented: ChannelScan.Rec.how ("the plain-words reason
+     * Hydra's walk ended with") when the record carries one, and
+     * Rec.atMs as the when-checked. No how: the row says the
+     * standing truth, that it was proven not playing when
+     * checked. No time on the record: no time is printed.
+     */
+    private String setAsideWhy(M3uParser.Channel c) {
+        ChannelScan.Rec rec = null;
+        try {
+            rec = ScanStore.load(this).get(c.url);
+        } catch (Exception ignored) {}
+        StringBuilder w = new StringBuilder();
+        if (rec != null && rec.how != null && !rec.how.trim().isEmpty()) {
+            w.append(String.format(Locale.US,
+                    trOr("live_set_aside_how_fmt", "Set aside — %1$s"),
+                    rec.how.trim()));
+        } else {
+            w.append(trOr("live_set_aside",
+                    "Set aside — not playing when checked"));
+        }
+        if (rec != null && rec.atMs > 0) {
+            String when = new SimpleDateFormat("MMM d, h:mm a", Locale.US)
+                    .format(new Date(rec.atMs));
+            w.append(" · ").append(String.format(Locale.US,
+                    trOr("live_checked_fmt", "checked %1$s"), when));
+        }
+        return w.toString();
     }
 
     /** One section of the list: a header row + its channels. */
@@ -1342,9 +1896,9 @@ public class MainActivity extends Activity {
                 TextView tv = convertView instanceof TextView ? (TextView) convertView : new TextView(MainActivity.this);
                 tv.setText((String) row);
                 tv.setTextColor(Sanctuary.GOLD_TEXT);
-                tv.setTextSize(14);
+                tv.setTextSize(16);
                 tv.setTypeface(tv.getTypeface(), android.graphics.Typeface.BOLD);
-                tv.setPadding(dp(6), dp(10), dp(6), dp(4));
+                tv.setPadding(dp(6), dp(12), dp(6), dp(6));
                 tv.setBackgroundColor(Sanctuary.PANEL_HI);
                 return tv;
             }
@@ -1358,7 +1912,7 @@ public class MainActivity extends Activity {
                 ll = new LinearLayout(MainActivity.this);
                 ll.setOrientation(LinearLayout.HORIZONTAL);
                 ll.setGravity(Gravity.CENTER_VERTICAL);
-                ll.setPadding(dp(8), dp(8), dp(4), dp(8));
+                ll.setPadding(dp(8), dp(12), dp(4), dp(12));
                 h = new Holder();
                 LinearLayout texts = new LinearLayout(MainActivity.this);
                 texts.setOrientation(LinearLayout.VERTICAL);
@@ -1367,7 +1921,7 @@ public class MainActivity extends Activity {
                 h.name.setTextSize(16);
                 h.sub = new TextView(MainActivity.this);
                 h.sub.setTextColor(Sanctuary.SUB);
-                h.sub.setTextSize(12);
+                h.sub.setTextSize(Sanctuary.TEXT_META);
                 texts.addView(h.name);
                 texts.addView(h.sub);
                 ll.addView(texts, new LinearLayout.LayoutParams(
@@ -1383,9 +1937,24 @@ public class MainActivity extends Activity {
             // ✗ dead, no badge = never checked. No record, no claim.
             HealthStore.Health hh = HealthStore.get(MainActivity.this, c.url);
             h.name.setText(HealthStore.badgeSymbol(hh) + c.displayName());
+            long nowMs = System.currentTimeMillis();
             StringBuilder subLine = new StringBuilder(hh == null
                     ? "? Not checked yet"
-                    : HealthStore.badgeText(hh, System.currentTimeMillis()));
+                    : HealthStore.badgeText(hh, nowMs));
+            // Evidence age (item 14): a STALE verdict — at or
+            // beyond FreshVerify.STALE_MS, the same boundary the
+            // warm-up passes re-prove at — carries its checked
+            // stamp in the sub-text, so old proof never presents
+            // as fresh. Fresh verdicts keep today's presentation
+            // (badgeText's relative "verified 3h ago" line) with
+            // nothing added. The format and key are the set-aside
+            // rows' own (live_checked_fmt, "MMM d, h:mm a").
+            if (hh != null && nowMs - hh.checkedAt >= FreshVerify.STALE_MS) {
+                String when = new SimpleDateFormat("MMM d, h:mm a", Locale.US)
+                        .format(new Date(hh.checkedAt));
+                subLine.append("  ·  ").append(String.format(Locale.US,
+                        trOr("live_checked_fmt", "checked %1$s"), when));
+            }
             // The DEFINITION line (v0.6.0, field note #2c): what the
             // channel IS — the database's categories when it has
             // them, else the playlist's group; absent rather than
@@ -1399,11 +1968,23 @@ public class MainActivity extends Activity {
             // when this channel's guide was actually fetched and
             // parsed; absent otherwise, never invented.
             String guideLine = guideLineFor(c);
-            h.sub.setText(guideLine.isEmpty() ? subLine.toString()
-                    : guideLine + "\n" + subLine);
+            String subText = guideLine.isEmpty() ? subLine.toString()
+                    : guideLine + "\n" + subLine;
+            // A SET-ASIDE row (item 13) carries its WHY first, in
+            // plain words from its scan record — see setAsideWhy.
+            // The row stays an ordinary tappable channel row in
+            // every other respect (tap plays via playChannel; the
+            // health badge above reads from HealthStore as usual).
+            String asideWhy = setAsideUrls.contains(c.url)
+                    ? setAsideWhy(c) : "";
+            if (!asideWhy.isEmpty()) {
+                subText = asideWhy + "\n" + subText;
+            }
+            h.sub.setText(subText);
             // Every row speaks (v0.5.0 accessibility hooks): TalkBack
             // and Braille displays read the row through this label.
-            ll.setContentDescription(c.displayName() + ". " + subLine);
+            ll.setContentDescription(c.displayName() + ". "
+                    + (asideWhy.isEmpty() ? "" : asideWhy + ". ") + subLine);
             boolean fav = favorites.contains(c.url);
             h.star.setText(fav ? "★" : "☆");
             h.star.setContentDescription(fav

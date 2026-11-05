@@ -100,6 +100,17 @@ public class LanguageIndexActivity extends Activity {
                 progress.setVisibility(View.GONE);
                 entries.clear();
                 entries.addAll(loaded);
+                // A–Z (fixpass-0200, item 12): the language walls
+                // render A–Z by the language's display name.
+                // Display-side only — LangRegistry's own order is
+                // untouched; this sorts the activity's loaded copy,
+                // and the counts ride with their language because
+                // the rows below are built from this same list (and
+                // taps index it too). Nothing on this screen pinned
+                // the viewer's own language first, so the order is
+                // pure A–Z.
+                entries.sort((a, b) -> SortOrders.azCompare(
+                        a.displayName(), b.displayName()));
                 rowTitles.clear();
                 rowSub.clear();
                 for (LangRegistry.Entry e : entries) {

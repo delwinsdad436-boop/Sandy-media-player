@@ -6,6 +6,8 @@ import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
@@ -53,6 +55,17 @@ public final class TranslatorActivity extends Activity {
     private EarCapture ear;
     private List<VoiceLangs.Row> langs = new ArrayList<>();
     private boolean capturing = false;
+
+    // The cycle guard (v0.20.0, item 11): every capture, turn and
+    // spoken rendering passes through its phases — IDLE, CAPTURING,
+    // WORKING, SPEAKING — so the ear can never be open while Sandy
+    // is working or speaking, one take can yield at most one turn,
+    // and her own rendered voice returning through the mic is
+    // rejected as an echo, never recorded as a turn.
+    private final TranslatorCycleGuard guard = new TranslatorCycleGuard();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** The guard seq owned by the capture now in flight (0 = none). */
+    private int captureSeq = 0;
 
     private Button sideABtn, sideBBtn;
     private TextView routeLine;
@@ -144,7 +157,17 @@ public final class TranslatorActivity extends Activity {
         useWordsBtn.setTextSize(17);
         useWordsBtn.setOnClickListener(v -> {
             String t = typeBox.getText().toString().trim();
-            if (!t.isEmpty()) runTurn(t);
+            if (t.isEmpty()) return;
+            // Typed turns take the same WORKING/SPEAKING discipline
+            // as spoken ones: they also produce spoken output, so
+            // they may not start while a capture, a turn or the
+            // voice is live.
+            if (!guard.tryBeginWork()) {
+                stateLine.setText(LangStore.tr(this,
+                        "translator_wait_voice"));
+                return;
+            }
+            runTurn(t);
         });
         root.addView(useWordsBtn);
 
@@ -196,6 +219,9 @@ public final class TranslatorActivity extends Activity {
         newBtn.setAllCaps(false);
         newBtn.setOnClickListener(v -> {
             conv.reset();
+            guard.fail();
+            capturing = false;
+            captureSeq = 0;
             heardView.setText("");
             renderedView.setText("");
             viaView.setText("");
@@ -212,22 +238,79 @@ public final class TranslatorActivity extends Activity {
         setContentView(scroll);
 
         speaker = new VoiceSpeaker(this);
+        // This activity is the ONLY owner of this VoiceSpeaker
+        // instance (Speak For Me holds its own instance and its
+        // own listener), and nothing else sets a listener on it —
+        // verified in source. Registering one is what gives the
+        // door knowledge of when its own spoken output ends: the
+        // drain resolves the guard's SPEAKING phase. Callbacks
+        // touch no views, so a late callback after destroy is safe.
+        speaker.setListener(new VoiceSpeaker.Listener() {
+            @Override public void onItemStart(SpeakQueue.Item item) {
+                // The receipt (heard + rendered) is already on
+                // screen from finishTurn; nothing to add here.
+            }
+            @Override public void onQueueDone() {
+                settleSpeech();
+            }
+            @Override public void onPackFailed(String packCode) {
+                // Not terminal by itself: VoiceSpeaker hands the
+                // item to the phone's voice next. Resolve only if
+                // the queue has in fact drained.
+                settleSpeechWhenDrained();
+            }
+            @Override public void onItemFailed(SpeakQueue.Item item) {
+                // Same: the failure dispatch continues into next()
+                // after this callback — the item may be followed by
+                // another, or by the drain (onQueueDone). Resolve
+                // only once the voice is truly done, checked after
+                // the in-flight dispatch settles.
+                settleSpeechWhenDrained();
+            }
+        });
         speaker.warmUp(this::refreshSides);
         ear = new EarCapture(this);
         ear.setListener(new EarCapture.Listener() {
             @Override public void onListening() {
+                if (!capturing) return;
                 stateLine.setText(LangStore.tr(TranslatorActivity.this,
                         "listen_state_listening"));
             }
             @Override public void onPartial(String text) {
+                if (!capturing) return;
                 heardView.setText(text);
             }
             @Override public void onFinal(String text, ListenRecord.State state) {
                 capturing = false;
+                // One take, at most one turn: the guard accepts a
+                // final exactly once, only for the live capture's
+                // seq. A re-delivered, stale or stopped-take final
+                // changes nothing — not even the state line.
+                if (!guard.acceptFinal(captureSeq)) return;
+                captureSeq = 0;
                 if (state == ListenRecord.State.HEARD
                         && text != null && !text.trim().isEmpty()) {
-                    runTurn(text.trim());
+                    String heard = text.trim();
+                    // ECHO: the "next speaker" saying, word for
+                    // word, exactly what Sandy just spoke aloud is
+                    // Sandy's own voice coming back through the
+                    // mic. Never a turn, the floor never passes,
+                    // the cycle returns to IDLE — and it is said
+                    // out loud on the state line, never silent.
+                    if (guard.isEcho(heard)) {
+                        guard.fail();
+                        stateLine.setText(LangStore.tr(
+                                TranslatorActivity.this,
+                                "translator_heard_own_voice"));
+                        return;
+                    }
+                    if (!guard.captureFinished()) {
+                        guard.fail();
+                        return;
+                    }
+                    runTurn(heard);
                 } else {
+                    guard.fail();
                     stateLine.setText(LangStore.tr(TranslatorActivity.this,
                             "translator_not_heard"));
                 }
@@ -248,8 +331,43 @@ public final class TranslatorActivity extends Activity {
         refreshSides();
     }
 
+    /** Resolve the guard's SPEAKING phase: the voice is done.
+     *  VoiceSpeaker delivers its callbacks on the main thread on
+     *  every path (system completions and pack completions are
+     *  posted to main inside VoiceSpeaker; the synchronous failure
+     *  branches are called from finishTurn on the UI thread), and
+     *  this marshals to main anyway, so a callback from any thread
+     *  resolves the phase safely. Idempotent via the guard: a
+     *  duplicate drain signal is a no-op. */
+    private void settleSpeech() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            guard.speechFinished();
+        } else {
+            mainHandler.post(guard::speechFinished);
+        }
+    }
+
+    /** For failure callbacks (onItemFailed / onPackFailed), which
+     *  VoiceSpeaker fires in the middle of its failure dispatch —
+     *  the queue continues into next() after they return, either
+     *  to another item or to the drain. Defer one main-thread
+     *  beat, then resolve SPEAKING only if the speaker reports
+     *  nothing left to say, so a multi-item queue keeps its
+     *  SPEAKING phase while later items are still spoken. */
+    private void settleSpeechWhenDrained() {
+        mainHandler.post(() -> {
+            if (guard.phase() == TranslatorCycleGuard.Phase.SPEAKING
+                    && (speaker == null || !speaker.isSpeaking())) {
+                guard.speechFinished();
+            }
+        });
+    }
+
     @Override
     protected void onDestroy() {
+        guard.fail();
+        capturing = false;
+        captureSeq = 0;
         if (ear != null) ear.stop();
         if (speaker != null) speaker.shutdown();
         for (TextMt mt : mtCache.values()) {
@@ -375,13 +493,36 @@ public final class TranslatorActivity extends Activity {
     // ------------------------------------------------ the turn
 
     private void startCapture() {
-        if (capturing) { ear.stop(); capturing = false; return; }
-        if (!currentRoute().ok()) { refreshSides(); return; }
+        if (capturing) {
+            // Tapping again stops the take. The stopped take's
+            // late final, if the service still delivers one, is
+            // refused by the guard: fail() invalidated its seq.
+            ear.stop();
+            capturing = false;
+            captureSeq = 0;
+            guard.fail();
+            return;
+        }
+        // A capture may start ONLY from IDLE: never while a turn
+        // is working and never while Sandy's own voice is still
+        // speaking. Refusal is said in plain words, and the ear
+        // is not started.
+        if (!guard.tryBeginCapture()) {
+            stateLine.setText(LangStore.tr(this,
+                    "translator_wait_voice"));
+            return;
+        }
+        if (!currentRoute().ok()) {
+            guard.fail();
+            refreshSides();
+            return;
+        }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},
                     REQ_MIC);
             stateLine.setText(LangStore.tr(this, "listen_no_mic"));
+            guard.fail();
             return;
         }
         heardView.setText("");
@@ -389,7 +530,9 @@ public final class TranslatorActivity extends Activity {
         viaView.setText("");
         if (ear.start(conv.fromIso())) {
             capturing = true;
+            captureSeq = guard.currentCaptureSeq();
         } else {
+            guard.fail();
             stateLine.setText(LangStore.tr(this, "listen_state_none"));
         }
     }
@@ -402,8 +545,11 @@ public final class TranslatorActivity extends Activity {
      * real route carried it.
      */
     private void runTurn(final String heard) {
+        // Callers have already entered the cycle: the ear path via
+        // captureFinished() (CAPTURING -> WORKING), the typed path
+        // via tryBeginWork() (IDLE -> WORKING).
         final TranslatorCore.Route route = currentRoute();
-        if (!route.ok()) { refreshSides(); return; }
+        if (!route.ok()) { guard.fail(); refreshSides(); return; }
         final String from = conv.fromIso();
         final String to = conv.toIso();
         stateLine.setText(LangStore.tr(this, "translator_working"));
@@ -455,12 +601,13 @@ public final class TranslatorActivity extends Activity {
                             String fail, TranslatorCore.Route route,
                             String from, String to) {
         if (!fail.isEmpty()) {
+            guard.fail();
             stateLine.setText(fail);
             return;
         }
         TranslatorCore.Turn turn =
                 conv.addTurn(heard, rendered, via, outMode, route);
-        if (turn == null) { refreshSides(); return; }
+        if (turn == null) { guard.fail(); refreshSides(); return; }
         heardView.setText(turn.heard);
         renderedView.setText(turn.rendered);
         viaView.setText(turn.via.isEmpty() ? ""
@@ -468,7 +615,13 @@ public final class TranslatorActivity extends Activity {
         stateLine.setText("");
         typeBox.setText("");
         appendHistory(turn);
-        // speak the rendering in the OTHER side's language
+        // Speak the rendering in the OTHER side's language — under
+        // the guard's phase discipline. willSpeak is true only
+        // when the mode asks for a voice AND a voice was actually
+        // resolved: the Voice.NONE case means no speech happens,
+        // so the cycle goes WORKING -> IDLE, never SPEAKING.
+        boolean willSpeak = false;
+        SpeakQueue speakQ = null;
         if (TranslatorCore.speaks(outMode)) {
             VoiceLangs.Row row = VoiceLangs.byIso1(langs, to);
             VoiceResolve.Result v = SpeakQueue.decide(row,
@@ -480,10 +633,23 @@ public final class TranslatorActivity extends Activity {
                         LangStore.tr(this, "translator_voice_missing"),
                         langName(to)));
             } else {
-                SpeakQueue q = new SpeakQueue();
-                q.enqueue(turn.rendered, to);
-                speaker.speak(q);
+                speakQ = new SpeakQueue();
+                speakQ.enqueue(turn.rendered, to);
+                willSpeak = true;
             }
+        }
+        // The transition is recorded BEFORE speak() is called, so
+        // a queue that drains or fails synchronously inside
+        // speak() resolves SPEAKING -> IDLE through the listener,
+        // in order. It also records the turn's heard + rendered
+        // text as the guard's echo signature. If the transition is
+        // refused the cycle no longer owns this turn (it was reset
+        // or failed while the MT worker ran) — the text stands,
+        // but nothing is spoken unguarded.
+        boolean inCycle = guard.turnRendered(willSpeak,
+                turn.heard, turn.rendered);
+        if (willSpeak && inCycle) {
+            speaker.speak(speakQ);
         }
         refreshSides();
     }

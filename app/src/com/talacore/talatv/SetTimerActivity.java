@@ -38,8 +38,20 @@ import java.util.TimeZone;
  * ("Tue Oct 20 · 8:00 PM – 9:30 PM"), and one Set button commits
  * exactly what the summary says. Both doors land here: the Timers
  * screen's "Set a timer", and the guide's tap on a future
- * programme (which arrives prefilled with the programme's own
- * channel and frame, editable before commit).
+ * programme.
+ *
+ * v0.20.0 (James's field ruling): the guide is no longer the
+ * scheduling mechanism — "just have it where people can set the
+ * time in whatever channel they want to record and it'll record
+ * as long as the timer set… in the background of the phone." So
+ * HAND ENTRY IS DURATION-FIRST: pick a channel, a date, a start
+ * time, then HOW LONG (big duration choices; stop = start +
+ * duration), with "choose an end time" kept as the alternative
+ * for anyone who wants the stop picker itself. The guide now
+ * arrives with ONLY a channel prefilled (X_NAME/X_URL/X_TVG, no
+ * title/start/stop). An intent that still carries a programme
+ * frame (X_START present) is honoured and editable as before —
+ * that is the prefill case, and the only one.
  *
  * An end at or before the start is an overnight frame: TimerFrame
  * rolls the end to the next day and the summary prints both days.
@@ -55,6 +67,12 @@ public class SetTimerActivity extends Activity {
 
     private M3uParser.Channel channel;
     private long startMs, stopMs;
+    /** True only when the intent carries a programme frame (X_START). */
+    private boolean programmePrefill;
+    /** The hand-entry length pick; stopMs = startMs + this, in minutes. */
+    private long chosenDurationMin = 60;
+    private final List<Button> durationBtns = new ArrayList<>();
+    private final List<Long> durationMins = new ArrayList<>();
     private EditText titleInput;
     private TextView channelView, summaryView;
     private Button dateBtn, startBtn, endBtn;
@@ -74,6 +92,8 @@ public class SetTimerActivity extends Activity {
     }
 
     private void buildUi() {
+        Bundle ex0 = getIntent().getExtras();
+        programmePrefill = ex0 != null && ex0.containsKey(X_START);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(16, 16, 20));
@@ -85,6 +105,13 @@ public class SetTimerActivity extends Activity {
         title.setTextSize(19);
         title.setTypeface(title.getTypeface(), Typeface.BOLD);
         root.addView(title);
+
+        TextView bgNote = new TextView(this);
+        bgNote.setText(LangStore.tr(this, "timer_background_note"));
+        bgNote.setTextColor(Color.rgb(170, 170, 180));
+        bgNote.setTextSize(13);
+        bgNote.setPadding(0, dp(6), 0, 0);
+        root.addView(bgNote);
 
         channelView = new TextView(this);
         channelView.setTextColor(Color.rgb(200, 200, 210));
@@ -100,28 +127,34 @@ public class SetTimerActivity extends Activity {
                 v -> pickDate());
         startBtn = frameButton(root, LangStore.tr(this, "timer_start"),
                 v -> pickTime(true));
-        endBtn = frameButton(root, LangStore.tr(this, "timer_end"),
-                v -> pickTime(false));
-
-        LinearLayout chips = new LinearLayout(this);
-        chips.setOrientation(LinearLayout.HORIZONTAL);
-        String[] labels = {"30 min", "1 h", "1½ h", "2 h", "3 h"};
-        long[] mins = {30, 60, 90, 120, 180};
-        for (int i = 0; i < labels.length; i++) {
-            final long m = mins[i];
-            Button b = new Button(this);
-            b.setText(labels[i]);
-            b.setOnClickListener(v -> {
-                stopMs = TimerFrame.stopFromDuration(startMs, m);
-                refresh();
-            });
-            chips.addView(b, new LinearLayout.LayoutParams(
-                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        if (!programmePrefill) {
+            // Duration-first hand entry: HOW LONG is the main
+            // question and the end follows from it (stop = start +
+            // duration). The end-time picker stays, captioned as
+            // the alternative, for anyone who wants it directly.
+            TextView durLabel = new TextView(this);
+            durLabel.setText(LangStore.tr(this, "timer_duration_label"));
+            durLabel.setTextColor(Color.rgb(170, 170, 180));
+            durLabel.setTextSize(14);
+            durLabel.setPadding(0, dp(10), 0, dp(4));
+            root.addView(durLabel);
+            root.addView(buildDurationChips(true));
+            TextView endCaption = new TextView(this);
+            endCaption.setText(LangStore.tr(this, "timer_choose_end_time"));
+            endCaption.setTextColor(Color.rgb(170, 170, 180));
+            endCaption.setTextSize(14);
+            endCaption.setPadding(0, dp(10), 0, 0);
+            root.addView(endCaption);
+            endBtn = frameButton(root, LangStore.tr(this, "timer_end"),
+                    v -> pickTime(false));
+        } else {
+            endBtn = frameButton(root, LangStore.tr(this, "timer_end"),
+                    v -> pickTime(false));
+            root.addView(buildDurationChips(false));
         }
-        root.addView(chips);
 
         titleInput = new EditText(this);
-        titleInput.setHint("Programme name (optional)");
+        titleInput.setHint(LangStore.tr(this, "timer_name_hint"));
         titleInput.setTextColor(Color.WHITE);
         titleInput.setHintTextColor(Color.rgb(150, 150, 160));
         root.addView(titleInput);
@@ -159,28 +192,62 @@ public class SetTimerActivity extends Activity {
         return b;
     }
 
+    /** The duration choices: 30 min, 1, 2, 3, 4 hours. Picking one
+     *  sets the length; the end time is derived (start + length),
+     *  never picked separately unless the end picker is used. */
+    private LinearLayout buildDurationChips(boolean big) {
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        String[] keys = {"timer_dur_30", "timer_dur_1h", "timer_dur_2h",
+                "timer_dur_3h", "timer_dur_4h"};
+        long[] mins = {30, 60, 120, 180, 240};
+        for (int i = 0; i < keys.length; i++) {
+            final long m = mins[i];
+            Button b = new Button(this);
+            b.setText(LangStore.tr(this, keys[i]));
+            if (big) b.setTextSize(17);
+            b.setOnClickListener(v -> {
+                chosenDurationMin = m;
+                stopMs = TimerFrame.stopFromDuration(startMs, m);
+                refresh();
+            });
+            durationBtns.add(b);
+            durationMins.add(m);
+            chips.addView(b, new LinearLayout.LayoutParams(
+                    0, big ? dp(56) : ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        return chips;
+    }
+
     private void initFrame() {
         Bundle ex = getIntent().getExtras();
         long now = System.currentTimeMillis();
         if (ex != null && ex.containsKey(X_URL)) {
+            // A channel may ride in alone (the guide's "record this
+            // channel" door) — that is a prefill of the CHANNEL
+            // only, never of the frame.
             channel = new M3uParser.Channel();
             channel.name = ex.getString(X_NAME, "");
             channel.url = ex.getString(X_URL, "");
             channel.tvgId = ex.getString(X_TVG, "");
+        }
+        if (programmePrefill) {
             startMs = ex.getLong(X_START, now + 3600_000L);
             stopMs = ex.getLong(X_STOP, startMs + 3600_000L);
             titleInput.setText(ex.getString(X_TITLE, ""));
         } else {
-            // Default: starts at the next whole hour, one hour long.
+            // Hand entry default: starts at the next whole hour,
+            // one hour long — the length pick takes it from there.
             Calendar c = Calendar.getInstance();
             c.add(Calendar.HOUR_OF_DAY, 1);
             c.set(Calendar.MINUTE, 0);
             c.set(Calendar.SECOND, 0);
             c.set(Calendar.MILLISECOND, 0);
             startMs = c.getTimeInMillis();
-            stopMs = startMs + 3600_000L;
+            stopMs = TimerFrame.stopFromDuration(startMs, chosenDurationMin);
         }
         if (stopMs <= startMs) stopMs = startMs + 3600_000L;
+        chosenDurationMin = TimerFrame.durationMinutes(startMs, stopMs);
         refresh();
     }
 
@@ -195,7 +262,34 @@ public class SetTimerActivity extends Activity {
         endBtn.setText(GuideModel.formatTime(stopMs, zone)
                 + (TimerFrame.spansMidnight(startMs, stopMs, zone)
                         ? " (" + GuideModel.formatDay(stopMs, zone) + ")" : ""));
-        summaryView.setText("● " + TimerFrame.summary(startMs, stopMs, zone));
+        // The whole frame as ONE thing before commit: channel,
+        // date, start, end, length — plus the pads line, so what
+        // actually gets taped (1 min early to 2 min past) is on
+        // the face too, not discovered later.
+        StringBuilder sb = new StringBuilder();
+        sb.append("● ");
+        if (channel != null) sb.append(channel.displayName()).append(" · ");
+        sb.append(TimerFrame.summary(startMs, stopMs, zone));
+        sb.append(" · ").append(LangStore.tr(this, "timer_length_label"))
+          .append(": ").append(lengthText(
+                  TimerFrame.durationMinutes(startMs, stopMs)));
+        sb.append("\n").append(LangStore.tr(this, "timer_pads_note"));
+        summaryView.setText(sb.toString());
+        long curMin = TimerFrame.durationMinutes(startMs, stopMs);
+        for (int i = 0; i < durationBtns.size(); i++) {
+            boolean sel = durationMins.get(i) == curMin;
+            Button b = durationBtns.get(i);
+            b.setTextColor(sel ? Color.rgb(150, 220, 150) : Color.WHITE);
+            b.setTypeface(b.getTypeface(),
+                    sel ? Typeface.BOLD : Typeface.NORMAL);
+        }
+    }
+
+    /** "30 min", "1 h", "1 h 30 min", "4 h" — the frame's length. */
+    private String lengthText(long mins) {
+        if (mins < 60) return mins + " min";
+        long h = mins / 60, m = mins % 60;
+        return m == 0 ? h + " h" : h + " h " + m + " min";
     }
 
     // ------------------------------------------------------------ picks
@@ -304,6 +398,10 @@ public class SetTimerActivity extends Activity {
                         hourOf(startMs), minuteOf(startMs), h, min,
                         TimeZone.getDefault());
                 stopMs = frame[1];
+                // Choosing an end time directly re-derives the
+                // length from the frame, so the summary and any
+                // matching duration chip stay truthful.
+                chosenDurationMin = TimerFrame.durationMinutes(startMs, stopMs);
             }
             refresh();
         }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), false).show();

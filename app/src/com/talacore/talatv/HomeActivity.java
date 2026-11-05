@@ -2,6 +2,7 @@ package com.talacore.talatv;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -9,9 +10,11 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.Handler;
+import android.speech.RecognizerIntent;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -39,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -62,6 +66,8 @@ import java.util.concurrent.Executors;
 public class HomeActivity extends Activity {
 
     private static final long CATALOG_TTL_MS = 12L * 3600L * 1000L;
+    // sandy-fixpass-0200 item 8: the voice-search round trip.
+    private static final int REQ_VOICE_SEARCH = 4417;
     private static final int WALK_CHUNK = 12;     // index pages per walk
     private static final int GRID_CHUNK = 90;     // country grid growth
     private static final int SHELF_CAP = 40;      // preview cap per country shelf
@@ -257,6 +263,15 @@ public class HomeActivity extends Activity {
         Sanctuary.styleButton(this, searchBtn, true);
         searchBtn.setOnClickListener(v -> doSearch());
         searchRow.addView(searchBtn);
+        // sandy-fixpass-0200 item 8: VOICE SEARCH — say the title
+        // instead of typing it; the heard words land in the same
+        // box and run the same search.
+        Button micBtn = new Button(this);
+        micBtn.setText("🎤");
+        micBtn.setContentDescription(LangStore.tr(this, "voice_search"));
+        Sanctuary.styleButton(this, micBtn, false);
+        micBtn.setOnClickListener(v -> startVoiceSearch());
+        searchRow.addView(micBtn);
         // v0.11.1: the same query box, searched as a person
         Button actorBtn = new Button(this);
         actorBtn.setText(LangStore.tr(this, "search_by_actor"));
@@ -315,6 +330,13 @@ public class HomeActivity extends Activity {
                 v -> startActivity(new Intent(this, ArchiveFilmsActivity.class)));
         catalogBox.addView(filmsBtn, storyLp);
 
+        // sandy-fixpass-0200 item 10: SURPRISE ME — one tap, a
+        // proven-available show picked by chance, ridden into the
+        // same episode resolver the show page uses (see pickSurprise).
+        Button surpriseBtn = doorButton("🎲  " + LangStore.tr(this, "home_surprise_me"),
+                v -> pickSurprise());
+        catalogBox.addView(surpriseBtn, storyLp);
+
         // v0.10.0: the language door — a chip row over the whole wall
         HorizontalScrollView langScroll = new HorizontalScrollView(this);
         langScroll.setHorizontalScrollBarEnabled(false);
@@ -357,14 +379,14 @@ public class HomeActivity extends Activity {
 
         statusView = new TextView(this);
         statusView.setTextColor(Sanctuary.MUTED);
-        statusView.setTextSize(12);
+        statusView.setTextSize(Sanctuary.TEXT_META);
         catalogBox.addView(statusView);
 
         // v0.17.0: the scan's standing line — last sweep's
         // verified counts, or its progress while it runs.
         scanLine = new TextView(this);
         scanLine.setTextColor(Sanctuary.SUB);
-        scanLine.setTextSize(12);
+        scanLine.setTextSize(Sanctuary.TEXT_META);
         scanLine.setPadding(0, dp(2), 0, 0);
         catalogBox.addView(scanLine);
 
@@ -488,6 +510,31 @@ public class HomeActivity extends Activity {
             myShowsEmpty.setVisibility(watchlist.isEmpty() ? View.VISIBLE : View.GONE);
             myShowsList.setVisibility(watchlist.isEmpty() ? View.GONE : View.VISIBLE);
         }
+        // sandy-fixpass-0200 item 5: coming back from the player,
+        // the Continue Watching rail must show the place the
+        // player just kept — re-render the wall from what stands.
+        if (!loading && !gathered.isEmpty() && sectionsBox != null) {
+            renderWall();
+        }
+    }
+
+    /** sandy-fixpass-0200 item 8: the voice search's answer —
+     *  the first heard phrase becomes the query, verbatim, and
+     *  runs the ordinary title search. A cancelled or empty take
+     *  changes nothing. */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_VOICE_SEARCH) return;
+        if (resultCode != RESULT_OK || data == null) return;
+        ArrayList<String> heard = data.getStringArrayListExtra(
+                RecognizerIntent.EXTRA_RESULTS);
+        if (heard == null || heard.isEmpty() || heard.get(0) == null) return;
+        String q = heard.get(0).trim();
+        if (q.isEmpty()) return;
+        searchBox.setText(q);
+        searchBox.setSelection(searchBox.getText().length());
+        doSearch();
     }
 
     @Override
@@ -855,6 +902,11 @@ public class HomeActivity extends Activity {
                 }
             }
             if (heroRec != null) addHero(heroRec);
+            // sandy-fixpass-0200 item 5: Continue Watching is the
+            // FIRST content row under the hero — and when no hero
+            // stands, it is the first row, full stop. An empty
+            // store renders nothing at all (honest absence).
+            addContinueWatchingSection();
             addSection("Airing today", airing, 20);
             if (!avail.isEmpty()) {
                 addSection(LangStore.tr(this, "wall_available"), avail,
@@ -909,6 +961,9 @@ public class HomeActivity extends Activity {
             } else if (!wallCountry.isEmpty()) {
                 addGridSection(wallCountry, shelves.get(wallCountry));
             } else {
+                // sandy-fixpass-0200 item 5: the language wall's
+                // first row is Continue Watching too, when it stands.
+                addContinueWatchingSection();
                 List<CatalogIndex.Record> avail = availableOf(bucket);
                 if (!avail.isEmpty()) {
                     // proven-available tiles: present in full, never capped
@@ -937,25 +992,32 @@ public class HomeActivity extends Activity {
      *  smoked-glass frame. The caller guarantees the record is
      *  proven available and carries art. */
     private void addHero(CatalogIndex.Record r) {
+        // RESTYLE (fixpass-0200, design-diff §2): the hero is a
+        // billboard now, not a framed panel — no glassPanel frame,
+        // the art bleeds to both screen edges (negative margins
+        // against the page pad, applied on the layout params
+        // below) and fills the taller HERO_H_DP frame, and the
+        // caption sits in a gradient scrim (Sanctuary.heroScrim)
+        // instead of the old flat OVERLAY band. Same record, same
+        // tap (openShow), same focus pop — presentation only.
         FrameLayout hero = new FrameLayout(this);
-        hero.setBackground(Sanctuary.glassPanel(this));
         hero.setFocusable(true);
         hero.setClickable(true);
         ImageView img = new ImageView(this);
         img.setScaleType(ImageView.ScaleType.CENTER_CROP);
         img.setLayoutParams(new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(196)));
-        Sanctuary.roundClip(this, img, Sanctuary.PANEL_RADIUS_DP);
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
         ImageCache.load(this, r.image, img);
         hero.addView(img);
         LinearLayout cap = new LinearLayout(this);
         cap.setOrientation(LinearLayout.VERTICAL);
-        cap.setBackgroundColor(Sanctuary.OVERLAY);
-        cap.setPadding(dp(14), dp(10), dp(14), dp(12));
+        cap.setBackground(Sanctuary.heroScrim());
+        cap.setPadding(dp(14), dp(36), dp(14), dp(12));
         TextView name = new TextView(this);
         name.setText(r.name);
         name.setTextColor(Sanctuary.INK);
-        name.setTextSize(24);
+        name.setTextSize(Sanctuary.TEXT_HERO_TITLE);
         name.setTypeface(name.getTypeface(), Typeface.BOLD);
         name.setMaxLines(1);
         cap.addView(name);
@@ -969,7 +1031,7 @@ public class HomeActivity extends Activity {
         }
         mark.setText(meta.toString());
         mark.setTextColor(Sanctuary.TEAL);
-        mark.setTextSize(13);
+        mark.setTextSize(Sanctuary.TEXT_META);
         mark.setMaxLines(1);
         cap.addView(mark);
         hero.addView(cap, new FrameLayout.LayoutParams(
@@ -980,11 +1042,129 @@ public class HomeActivity extends Activity {
         hero.setOnClickListener(v -> openShow(r));
         Sanctuary.focusPop(hero);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(8);
-        lp.bottomMargin = dp(6);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(Sanctuary.HERO_H_DP));
+        lp.topMargin = dp(0);
+        lp.bottomMargin = dp(16);
+        lp.leftMargin = -dp(Sanctuary.PAGE_PAD_DP);
+        lp.rightMargin = -dp(Sanctuary.PAGE_PAD_DP);
         sectionsBox.addView(hero, lp);
+    }
+
+    // ---------------------------------- continue watching (item 5)
+
+    /**
+     * The Continue Watching rail (sandy-fixpass-0200 item 5): the
+     * places the player kept, newest first, as big tiles in the
+     * same PosterRail geometry as every other rail. Titles and art
+     * come from the stored entry itself; the second line is plain
+     * time-left math off the stored place — nothing is promised
+     * beyond the tap re-entering the player at the stored URL,
+     * which is the player's ordinary contract (url / name / ckey,
+     * the way SourcesActivity and RecordingsActivity launch it).
+     * An empty store adds NOTHING — no header, no rail.
+     */
+    private void addContinueWatchingSection() {
+        final List<ContinueWatching.Entry> entries = ContinueWatching.list(this);
+        if (entries.isEmpty()) return;
+        TextView header = new TextView(this);
+        header.setText(LangStore.tr(this, "continue_watching"));
+        header.setTextColor(Sanctuary.INK);
+        header.setTextSize(Sanctuary.TEXT_SECTION);
+        header.setTypeface(header.getTypeface(), Typeface.BOLD);
+        header.setPadding(0, dp(Sanctuary.SECTION_GAP_DP), 0, dp(10));
+        sectionsBox.addView(header);
+
+        final int count = entries.size();
+        final int stride = dp(Sanctuary.RAIL_CARD_W_DP);
+        final PosterRail rail = new PosterRail(this);
+        rail.setTiles(new PosterRail.Tiles() {
+            @Override public int count() { return count; }
+            @Override public int stridePx() { return stride; }
+            @Override public View createTile() { return createCwCard(); }
+            @Override public void bindTile(View tile, int index) {
+                bindCwCard((LinearLayout) tile, entries.get(index), rail, index);
+            }
+        });
+        sectionsBox.addView(rail, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+
+    /** One Continue Watching tile: poster, title, time left —
+     *  always the same three children, so a bind can set all of
+     *  them (the rail-tile total-bind contract). */
+    private LinearLayout createCwCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(4), dp(2), dp(4), dp(2));
+        card.setLayoutParams(new LinearLayout.LayoutParams(
+                dp(Sanctuary.RAIL_CARD_W_DP),
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        ImageView img = new ImageView(this);
+        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        img.setLayoutParams(new LinearLayout.LayoutParams(
+                dp(Sanctuary.RAIL_IMG_W_DP), dp(Sanctuary.RAIL_IMG_H_DP)));
+        img.setBackground(Sanctuary.posterFrame(this));
+        img.setDuplicateParentStateEnabled(true);
+        Sanctuary.roundClip(this, img, Sanctuary.TILE_RADIUS_DP);
+        card.addView(img);
+        TextView name = new TextView(this);
+        name.setTextSize(Sanctuary.TEXT_TILE_NAME);
+        name.setMaxLines(2);
+        card.addView(name);
+        TextView left = new TextView(this);
+        left.setTextSize(Sanctuary.TEXT_META);
+        left.setMaxLines(2);
+        card.addView(left);
+        card.setFocusable(true);
+        Sanctuary.focusPop(card);
+        return card;
+    }
+
+    private void bindCwCard(LinearLayout card, ContinueWatching.Entry e,
+                            PosterRail rail, int index) {
+        ImageView img = (ImageView) card.getChildAt(0);
+        ImageCache.load(this, e.image, img);
+        TextView name = (TextView) card.getChildAt(1);
+        name.setText(e.title);
+        name.setTextColor(Sanctuary.INK);
+        TextView left = (TextView) card.getChildAt(2);
+        String leftText = cwLeftText(e);
+        left.setText(leftText);
+        left.setTextColor(Sanctuary.TEAL);
+        card.setContentDescription(e.title + " — " + leftText);
+        card.setOnClickListener(v -> openContinue(e));
+        card.setOnFocusChangeListener((v, has) -> {
+            Sanctuary.applyPop(v, has);
+            if (has) rail.bringIntoView(index);
+        });
+    }
+
+    /** "34 min left" from the stored place — plain math on the
+     *  numbers the store was handed. When no duration is known,
+     *  the tile falls back to the standing resume words instead
+     *  of inventing a time. */
+    private String cwLeftText(ContinueWatching.Entry e) {
+        if (e.durationMs > 0) {
+            long leftMs = Math.max(0, e.durationMs - e.positionMs);
+            long mins = Math.max(1, (leftMs + 59_999L) / 60_000L);
+            return String.format(Locale.US,
+                    LangStore.tr(this, "continue_left_fmt"), mins);
+        }
+        return LangStore.tr(this, "kept_resume");
+    }
+
+    /** Back into the player at the kept place. The launch
+     *  contract is PlayerActivity's own, copied from
+     *  SourcesActivity.launchSource / RecordingsActivity.play:
+     *  url, name, ckey. (The player's resume from ckey's kept
+     *  place is the player's standing behavior.) */
+    private void openContinue(ContinueWatching.Entry e) {
+        Intent i = new Intent(this, PlayerActivity.class);
+        i.putExtra("url", e.playUrl);
+        i.putExtra("name", e.streamName);
+        i.putExtra("ckey", e.key);
+        startActivity(i);
     }
 
     private void addGatherMoreIfNeeded() {
@@ -1094,10 +1274,10 @@ public class HomeActivity extends Activity {
         if (shows == null || shows.isEmpty()) return;
         TextView header = new TextView(this);
         header.setText(title);
-        header.setTextColor(Sanctuary.GOLD_TEXT);
-        header.setTextSize(17);
+        header.setTextColor(Sanctuary.INK);
+        header.setTextSize(Sanctuary.TEXT_SECTION);
         header.setTypeface(header.getTypeface(), Typeface.BOLD);
-        header.setPadding(0, dp(Sanctuary.SECTION_GAP_DP), 0, dp(8));
+        header.setPadding(0, dp(Sanctuary.SECTION_GAP_DP), 0, dp(10));
         sectionsBox.addView(header);
 
         // v0.17.0: every rail is a windowed PosterRail — tiles
@@ -1105,7 +1285,7 @@ public class HomeActivity extends Activity {
         // however long the shelf runs (FLUID, James's criterion).
         final List<CatalogIndex.Record> railShows = shows;
         final int count = Math.min(cap, shows.size());
-        final int stride = dp(116);
+        final int stride = dp(Sanctuary.RAIL_CARD_W_DP);
         final PosterRail rail = new PosterRail(this);
         rail.setTiles(new PosterRail.Tiles() {
             @Override public int count() { return count; }
@@ -1130,21 +1310,23 @@ public class HomeActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(4), dp(2), dp(4), dp(2));
-        card.setLayoutParams(new LinearLayout.LayoutParams(dp(116),
+        card.setLayoutParams(new LinearLayout.LayoutParams(
+                dp(Sanctuary.RAIL_CARD_W_DP),
                 ViewGroup.LayoutParams.WRAP_CONTENT));
         ImageView img = new ImageView(this);
         img.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        img.setLayoutParams(new LinearLayout.LayoutParams(dp(108), dp(152)));
+        img.setLayoutParams(new LinearLayout.LayoutParams(
+                dp(Sanctuary.RAIL_IMG_W_DP), dp(Sanctuary.RAIL_IMG_H_DP)));
         img.setBackground(Sanctuary.posterFrame(this));
         img.setDuplicateParentStateEnabled(true);
         Sanctuary.roundClip(this, img, Sanctuary.TILE_RADIUS_DP);
         card.addView(img);
         TextView name = new TextView(this);
-        name.setTextSize(12);
+        name.setTextSize(Sanctuary.TEXT_TILE_NAME);
         name.setMaxLines(2);
         card.addView(name);
         TextView rating = new TextView(this);
-        rating.setTextSize(11);
+        rating.setTextSize(Sanctuary.TEXT_META);
         card.addView(rating);
         TextView mark = new TextView(this);
         mark.setMaxLines(1);
@@ -1186,10 +1368,10 @@ public class HomeActivity extends Activity {
         if (shows == null) shows = new ArrayList<>();
         TextView header = new TextView(this);
         header.setText(shelfName + " — " + shows.size() + " shows");
-        header.setTextColor(Sanctuary.GOLD_TEXT);
-        header.setTextSize(17);
+        header.setTextColor(Sanctuary.INK);
+        header.setTextSize(Sanctuary.TEXT_SECTION);
         header.setTypeface(header.getTypeface(), Typeface.BOLD);
-        header.setPadding(0, dp(Sanctuary.SECTION_GAP_DP), 0, dp(8));
+        header.setPadding(0, dp(Sanctuary.SECTION_GAP_DP), 0, dp(10));
         sectionsBox.addView(header);
 
         int n = Math.min(wallGridShown, shows.size());
@@ -1237,7 +1419,7 @@ public class HomeActivity extends Activity {
         TextView t = new TextView(this);
         t.setText(text);
         t.setTextColor(Sanctuary.MUTED);
-        t.setTextSize(13);
+        t.setTextSize(Sanctuary.TEXT_BODY);
         t.setPadding(0, dp(12), 0, 0);
         sectionsBox.addView(t);
     }
@@ -1246,7 +1428,8 @@ public class HomeActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(4), dp(2), dp(4), dp(2));
-        card.addView(posterImage(r, ViewGroup.LayoutParams.MATCH_PARENT, dp(150)));
+        card.addView(posterImage(r, ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(Sanctuary.GRID_IMG_H_DP)));
         card.addView(nameLine(r));
         if (r.rating > 0) card.addView(ratingLine(r));
         card.addView(markLine(r));
@@ -1292,7 +1475,7 @@ public class HomeActivity extends Activity {
         TextView name = new TextView(this);
         name.setText(r.name);
         name.setTextColor(Sanctuary.INK);
-        name.setTextSize(12);
+        name.setTextSize(Sanctuary.TEXT_TILE_NAME);
         name.setMaxLines(2);
         return name;
     }
@@ -1301,7 +1484,7 @@ public class HomeActivity extends Activity {
         TextView rating = new TextView(this);
         rating.setText("★ " + String.format(Locale.US, "%.1f", r.rating));
         rating.setTextColor(Sanctuary.GOLD);
-        rating.setTextSize(11);
+        rating.setTextSize(Sanctuary.TEXT_META);
         return rating;
     }
 
@@ -1323,14 +1506,14 @@ public class HomeActivity extends Activity {
         if (CardState.playPromise(st)) {
             t.setText("✓ " + LangStore.tr(this, "wall_available"));
             t.setTextColor(Sanctuary.TEAL);
-            t.setTextSize(10);
+            t.setTextSize(Sanctuary.TEXT_META);
             t.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
         } else {
             // catalog-only is a headline on the card, not a
             // footnote (v0.14.0): bigger, brighter, unmissable
             t.setText(LangStore.tr(this, CardState.labelKey(st)));
             t.setTextColor(Sanctuary.GOLD_DIM);
-            t.setTextSize(12);
+            t.setTextSize(Sanctuary.TEXT_META);
             t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         }
     }
@@ -1652,21 +1835,20 @@ public class HomeActivity extends Activity {
                     }
                     resultsMode = "people";
                     peopleResults = people;
-                    ArrayAdapter<TvMaze.Person> ad = new ArrayAdapter<TvMaze.Person>(
-                            this, android.R.layout.simple_list_item_2,
-                            android.R.id.text1, people) {
+                    android.widget.BaseAdapter ad = new android.widget.BaseAdapter() {
+                        @Override public int getCount() { return people.size(); }
+                        @Override public Object getItem(int pos) { return people.get(pos); }
+                        @Override public long getItemId(int pos) { return people.get(pos).id; }
                         @Override
                         public View getView(int pos, View convertView, ViewGroup parent) {
-                            View v = super.getView(pos, convertView, parent);
-                            TvMaze.Person p = people.get(pos);
-                            TextView t1 = v.findViewById(android.R.id.text1);
-                            t1.setText(p.name);
-                            t1.setTextColor(Sanctuary.INK);
-                            TextView t2 = v.findViewById(android.R.id.text2);
-                            t2.setText(p.countryName.isEmpty() ? "Tap for their shows"
-                                    : p.countryName + " — tap for their shows");
-                            t2.setTextColor(Sanctuary.SUB);
-                            return v;
+                            LinearLayout card = HomeActivity.this.searchCardRow(convertView);
+                            TvMaze.Person person = people.get(pos);
+                            HomeActivity.this.bindSearchCard(card, person.imageMedium,
+                                    person.name,
+                                    person.countryName.isEmpty() ? "Tap for their shows"
+                                            : person.countryName + " \u2014 tap for their shows",
+                                    null, 0);
+                            return card;
                         }
                     };
                     resultsList.setAdapter(ad);
@@ -1712,54 +1894,29 @@ public class HomeActivity extends Activity {
                         @Override public long getItemId(int pos) { return recs.get(pos).id; }
                         @Override
                         public View getView(int pos, View convertView, ViewGroup parent) {
-                            LinearLayout ll;
-                            TextView main, sub, mark;
-                            if (convertView instanceof LinearLayout) {
-                                ll = (LinearLayout) convertView;
-                                main = (TextView) ll.getChildAt(0);
-                                sub = (TextView) ll.getChildAt(1);
-                                mark = (TextView) ll.getChildAt(2);
-                            } else {
-                                ll = new LinearLayout(HomeActivity.this);
-                                ll.setOrientation(LinearLayout.VERTICAL);
-                                ll.setPadding(dp(8), dp(6), dp(8), dp(6));
-                                main = new TextView(HomeActivity.this);
-                                main.setTextColor(Sanctuary.INK);
-                                main.setTextSize(15);
-                                sub = new TextView(HomeActivity.this);
-                                sub.setTextColor(Sanctuary.SUB);
-                                sub.setTextSize(12);
-                                mark = new TextView(HomeActivity.this);
-                                mark.setTextSize(11);
-                                ll.addView(main);
-                                ll.addView(sub);
-                                ll.addView(mark);
-                            }
+                            LinearLayout card = HomeActivity.this.searchCardRow(convertView);
                             CatalogIndex.Record r = recs.get(pos);
-                            main.setText(r.name);
                             StringBuilder meta = new StringBuilder();
                             int y = CatalogIndex.yearOf(r);
                             if (y >= 0) meta.append(y);
                             if (!r.genres.isEmpty()) {
-                                if (meta.length() > 0) meta.append(" · ");
-                                meta.append(String.join(" · ", r.genres));
+                                if (meta.length() > 0) meta.append(" \u00b7 ");
+                                meta.append(String.join(" \u00b7 ", r.genres));
                             }
                             if (r.rating > 0) {
-                                if (meta.length() > 0) meta.append(" · ");
-                                meta.append("★ ").append(String.format(
+                                if (meta.length() > 0) meta.append(" \u00b7 ");
+                                meta.append("\u2605 ").append(String.format(
                                         Locale.US, "%.1f", r.rating));
                             }
-                            sub.setText(meta.toString());
-                            if (isAvailable(r)) {
-                                mark.setText("✓ " + LangStore.tr(
-                                        HomeActivity.this, "wall_available"));
-                                mark.setTextColor(Sanctuary.TEAL);
-                            } else {
-                                mark.setText(LangStore.tr(
-                                        HomeActivity.this, "wall_catalog_only"));
-                                mark.setTextColor(Sanctuary.SUB);
-                            }
-                            return ll;
+                            boolean avail = isAvailable(r);
+                            HomeActivity.this.bindSearchCard(card, r.image,
+                                    r.name, meta.toString(),
+                                    avail ? "\u2713 " + LangStore.tr(
+                                            HomeActivity.this, "wall_available")
+                                            : LangStore.tr(HomeActivity.this,
+                                                    "wall_catalog_only"),
+                                    avail ? Sanctuary.TEAL : Sanctuary.SUB);
+                            return card;
                         }
                     });
                     Toast.makeText(this, "Shows with " + p.name + " — " + recs.size(),
@@ -1777,6 +1934,209 @@ public class HomeActivity extends Activity {
 
     // ------------------------------------------------------------- search
 
+    // ------------------------------------------ voice search (item 8)
+
+    /**
+     * VOICE SEARCH (sandy-fixpass-0200 item 8): hand the phone's
+     * recognizer the same hint the search box shows, take its
+     * first answer as the query (onActivityResult runs doSearch).
+     * When this phone has no recognizer to hand it to — no activity
+     * answers the intent, or the launch itself is refused — the
+     * fall-back is plain words and the keyboard, the same honest
+     * "no ear on this phone" posture ListenActivity/EarCapture
+     * take (listen_state_none): never a pretend listen.
+     */
+    private void startVoiceSearch() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT,
+                LangStore.tr(this, "home_search_shows_hint"));
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            voiceSearchUnavailable();
+            return;
+        }
+        try {
+            startActivityForResult(intent, REQ_VOICE_SEARCH);
+        } catch (ActivityNotFoundException e) {
+            voiceSearchUnavailable();
+        }
+    }
+
+    private void voiceSearchUnavailable() {
+        Toast.makeText(this, LangStore.tr(this, "voice_search_unavailable"),
+                Toast.LENGTH_LONG).show();
+        searchBox.requestFocus();
+        InputMethodManager imm = (InputMethodManager)
+                getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.showSoftInput(searchBox, InputMethodManager.SHOW_IMPLICIT);
+    }
+
+    // ------------------------------------------ surprise me (item 10)
+
+    /**
+     * SURPRISE ME (sandy-fixpass-0200 item 10): one tap —
+     * (a) a genre at random from the genres the PROVEN-available
+     * pool actually holds (the same pool the hero/shelves stand
+     * on: shelf evidence or an Archive proof, via isAvailable),
+     * (b) a show at random in that genre, excluding anything
+     * already standing in Continue Watching (by title) and the
+     * immediately previous surprise pick (kept in preferences),
+     * then (c) the show page's own episode door: SourcesActivity
+     * with mode="episode", season 1, number 1 — so the existing
+     * resolver proves and plays it, or says plainly there that it
+     * couldn't. This method claims nothing about playing; it only
+     * makes a pick and opens the proven door with it.
+     *
+     * An empty proven pool (offline, nothing gathered/proven)
+     * earns a plain toast and nothing else.
+     */
+    private void pickSurprise() {
+        List<CatalogIndex.Record> pool = availableOf(
+                new ArrayList<>(gathered.values()));
+        if (pool.isEmpty()) {
+            Toast.makeText(this, LangStore.tr(this, "surprise_none"),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        // Not fresh surprises: shows already in Continue Watching.
+        Set<String> cwTitles = new HashSet<>();
+        for (ContinueWatching.Entry e : ContinueWatching.list(this)) {
+            cwTitles.add(SearchRank.normalize(e.title));
+        }
+        List<CatalogIndex.Record> fresh = new ArrayList<>();
+        for (CatalogIndex.Record r : pool) {
+            if (!cwTitles.contains(SearchRank.normalize(r.name))) fresh.add(r);
+        }
+        if (fresh.isEmpty()) {
+            Toast.makeText(this, LangStore.tr(this, "surprise_no_fresh"),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        // And not the immediately previous pick — unless it is the
+        // only fresh show standing, where repeating it beats a
+        // dead button (flagged in the run report).
+        int lastId = getPreferences(MODE_PRIVATE)
+                .getInt("surprise_last_id", -1);
+        List<CatalogIndex.Record> eligible = new ArrayList<>();
+        for (CatalogIndex.Record r : fresh) if (r.id != lastId) eligible.add(r);
+        if (eligible.isEmpty()) eligible = fresh;
+
+        // (a) a genre from the eligible pool's own genres
+        Set<String> genreSet = new HashSet<>();
+        for (CatalogIndex.Record r : eligible) genreSet.addAll(r.genres);
+        List<String> genres = new ArrayList<>(genreSet);
+        Random rnd = new Random(System.nanoTime());
+        CatalogIndex.Record pick;
+        if (genres.isEmpty()) {
+            // Proven shows that list no genre: the pick is from
+            // the eligible pool itself — no genre is invented.
+            pick = eligible.get(rnd.nextInt(eligible.size()));
+        } else {
+            String genre = genres.get(rnd.nextInt(genres.size()));
+            List<CatalogIndex.Record> inGenre = new ArrayList<>();
+            for (CatalogIndex.Record r : eligible) {
+                if (r.genres.contains(genre)) inGenre.add(r);
+            }
+            // (b) a show at random in that genre
+            pick = inGenre.get(rnd.nextInt(inGenre.size()));
+        }
+        getPreferences(MODE_PRIVATE).edit()
+                .putInt("surprise_last_id", pick.id).apply();
+
+        // (c) the episode door, exactly as ShowActivity opens it
+        // for an episode tap (ShowActivity's episodeList listener).
+        Intent i = new Intent(this, SourcesActivity.class);
+        i.putExtra("mode", "episode");
+        i.putExtra("showId", pick.id);
+        i.putExtra("showName", pick.name);
+        i.putExtra("showLanguage", pick.language);
+        i.putExtra("season", 1);
+        i.putExtra("number", 1);
+        i.putExtra("epName", "");
+        startActivity(i);
+    }
+
+    // ------------------------------------------------- search cards
+
+    /**
+     * RESTYLE (fixpass-0200 item 7, design-diff \u00a79): search
+     * results stand as CARDS \u2014 poster art at the left in true
+     * 2:3, title and meta beside it, and the honest mark under
+     * the meta in the modes that carry one \u2014 instead of a
+     * divider text list. One builder for all three results modes
+     * (shows, people, credits), so every card has the same
+     * children and every bind sets them all; a card from another
+     * mode can therefore recycle safely (and the tag check keeps
+     * any foreign row out). Presentation only: the lists, their
+     * order, and the tap handling on resultsList are unchanged.
+     */
+    private LinearLayout createSearchCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setTag("searchCard");
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setBackground(Sanctuary.glassPanel(this));
+        card.setPadding(dp(8), dp(8), dp(8), dp(8));
+        ImageView img = new ImageView(this);
+        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        img.setBackground(Sanctuary.posterFrame(this));
+        img.setDuplicateParentStateEnabled(true);
+        Sanctuary.roundClip(this, img, Sanctuary.TILE_RADIUS_DP);
+        card.addView(img, new LinearLayout.LayoutParams(dp(54), dp(81)));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(10), 0, 0, 0);
+        TextView name = new TextView(this);
+        name.setTextColor(Sanctuary.INK);
+        name.setTextSize(16);
+        name.setTypeface(name.getTypeface(), Typeface.BOLD);
+        name.setMaxLines(2);
+        col.addView(name);
+        TextView meta = new TextView(this);
+        meta.setTextColor(Sanctuary.SUB);
+        meta.setTextSize(Sanctuary.TEXT_META);
+        meta.setMaxLines(2);
+        col.addView(meta);
+        TextView mark = new TextView(this);
+        mark.setTextSize(Sanctuary.TEXT_META);
+        col.addView(mark);
+        card.addView(col, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return card;
+    }
+
+    /** The total bind for a search card: art, title, meta, mark. */
+    private void bindSearchCard(View convertView, String image,
+                                String title, String meta,
+                                String mark, int markColor) {
+        LinearLayout card = (LinearLayout) convertView;
+        ImageView img = (ImageView) card.getChildAt(0);
+        ImageCache.load(this, image, img);
+        LinearLayout col = (LinearLayout) card.getChildAt(1);
+        ((TextView) col.getChildAt(0)).setText(title);
+        ((TextView) col.getChildAt(1)).setText(meta);
+        TextView markView = (TextView) col.getChildAt(2);
+        if (mark == null || mark.isEmpty()) {
+            markView.setVisibility(View.GONE);
+            markView.setText("");
+        } else {
+            markView.setVisibility(View.VISIBLE);
+            markView.setText(mark);
+            markView.setTextColor(markColor);
+        }
+        card.setContentDescription(title);
+    }
+
+    /** Reuse a recycled search card, or build one. */
+    private LinearLayout searchCardRow(View convertView) {
+        if (convertView instanceof LinearLayout
+                && "searchCard".equals(convertView.getTag())) {
+            return (LinearLayout) convertView;
+        }
+        return createSearchCard();
+    }
+
     private void doSearch() {
         String q = searchBox.getText().toString().trim();
         if (q.isEmpty()) return;
@@ -1784,38 +2144,43 @@ public class HomeActivity extends Activity {
         exec.execute(() -> {
             try {
                 List<TvMaze.Show> results = TvMaze.parseSearch(Net.getString(TvMaze.searchUrl(q)));
+                // sandy-fixpass-0200 item 1: tighten the head of
+                // the list against the query (exact, starts-with,
+                // word-boundary…) while the loose spill keeps its
+                // incoming order below — SearchRank is pure and
+                // returns a new list; TVmaze's list is untouched.
+                final List<TvMaze.Show> ranked =
+                        SearchRank.rank(q, results, s -> s.name);
                 runOnUiThread(() -> {
                     progress.setVisibility(View.GONE);
                     resultsMode = "shows";
-                    searchResults = results;
-                    if (results.isEmpty()) {
+                    searchResults = ranked;
+                    if (ranked.isEmpty()) {
                         Toast.makeText(this, "No shows matched that on TVmaze.",
                                 Toast.LENGTH_LONG).show();
                         return;
                     }
-                    ArrayAdapter<TvMaze.Show> ad = new ArrayAdapter<TvMaze.Show>(this,
-                            android.R.layout.simple_list_item_2, android.R.id.text1, results) {
+                    android.widget.BaseAdapter ad = new android.widget.BaseAdapter() {
+                        @Override public int getCount() { return ranked.size(); }
+                        @Override public Object getItem(int pos) { return ranked.get(pos); }
+                        @Override public long getItemId(int pos) { return ranked.get(pos).id; }
                         @Override
                         public View getView(int pos, View convertView, ViewGroup parent) {
-                            View v = super.getView(pos, convertView, parent);
-                            TvMaze.Show s = results.get(pos);
-                            TextView t1 = v.findViewById(android.R.id.text1);
-                            t1.setText(s.name);
-                            t1.setTextColor(Sanctuary.INK);
-                            String meta = String.join(" · ", s.genres)
-                                    + (s.language.isEmpty() ? "" : "  ·  " + s.language)
-                                    + (s.rating > 0 ? "  ·  ★ "
-                                        + String.format(Locale.US, "%.1f", s.rating) : "");
-                            TextView t2 = v.findViewById(android.R.id.text2);
-                            t2.setText(meta);
-                            t2.setTextColor(Sanctuary.SUB);
-                            return v;
+                            LinearLayout card = HomeActivity.this.searchCardRow(convertView);
+                            TvMaze.Show sh = ranked.get(pos);
+                            String meta = String.join(" \u00b7 ", sh.genres)
+                                    + (sh.language.isEmpty() ? "" : "  \u00b7  " + sh.language)
+                                    + (sh.rating > 0 ? "  \u00b7  \u2605 "
+                                        + String.format(Locale.US, "%.1f", sh.rating) : "");
+                            HomeActivity.this.bindSearchCard(card, sh.imageMedium,
+                                    sh.name, meta, null, 0);
+                            return card;
                         }
                     };
                     resultsList.setAdapter(ad);
                     catalogScroll.setVisibility(View.GONE);
                     resultsList.setVisibility(View.VISIBLE);
-                    Toast.makeText(this, results.size() + " shows — tap Catalog to go back",
+                    Toast.makeText(this, ranked.size() + " shows — tap Catalog to go back",
                             Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
