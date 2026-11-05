@@ -22,10 +22,10 @@ package com.talacore.talatv;
 public final class AppVersion {
 
     /** versionName, exactly as the manifest states it. */
-    public static final String NAME = "0.20.0";
+    public static final String NAME = "0.20.1";
 
     /** versionCode, exactly as the manifest states it. */
-    public static final int CODE = 26;
+    public static final int CODE = 27;
 
     /** The User-Agent every fetch in the app falls back to. */
     public static final String UA = "Sandy/" + NAME;

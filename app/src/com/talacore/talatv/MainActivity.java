@@ -841,8 +841,17 @@ public class MainActivity extends Activity {
                     && !"Undefined".equalsIgnoreCase(ch.group.trim())) {
                 label += " · " + ch.group.trim();
             }
+            // A favorite NEVER vanishes (fixpass-0201): the rail
+            // never filtered by scan verdict and still does not —
+            // a scan-dead favorite stands here wearing its mark,
+            // the full why (reason + checked date) spoken in its
+            // content description, the same words a list row gets.
+            boolean railDead = ScanStore.verdictOf(this, ch.url)
+                    == ChannelScan.V_DEAD;
+            if (railDead) label += " · set aside";
             b.setText("★ " + label);
-            b.setContentDescription(label);
+            b.setContentDescription(railDead
+                    ? label + ". " + setAsideWhy(ch) : label);
             Sanctuary.styleChip(this, b, false);
             // Tap plays through the exact path a list tap takes.
             b.setOnClickListener(v -> playChannel(ch));
@@ -874,11 +883,20 @@ public class MainActivity extends Activity {
      * as the alternative.)
      */
     private static void rankBySearchQuery(List<M3uParser.Channel> channels,
-                                          String qLowerTrimmed) {
+                                          String qLowerTrimmed,
+                                          java.util.Set<String> scanDeadUrls) {
         if (channels == null || qLowerTrimmed == null
                 || qLowerTrimmed.isEmpty()) return;
+        // Tier first; within a tier, live above scan-dead
+        // (fixpass-0201, Reachability.searchOrder). List.sort is
+        // stable, so order inside a (tier, dead) group stands.
         channels.sort((a, b) -> Integer.compare(
-                searchTier(a, qLowerTrimmed), searchTier(b, qLowerTrimmed)));
+                Reachability.searchOrder(searchTier(a, qLowerTrimmed),
+                        scanDeadUrls != null
+                                && scanDeadUrls.contains(a.url)),
+                Reachability.searchOrder(searchTier(b, qLowerTrimmed),
+                        scanDeadUrls != null
+                                && scanDeadUrls.contains(b.url))));
     }
 
     private static int searchTier(M3uParser.Channel c, String q) {
@@ -1174,15 +1192,13 @@ public class MainActivity extends Activity {
                 if (idx >= 0) languageSpinner.setSelection(idx);
             }
         }
-        // The title count is a presented count (v0.17.0): links
-        // the channel scan convicted dead are off the shelf and
-        // out of the number — printed counts are verified counts.
-        int presented = 0;
-        Map<String, ChannelScan.Rec> scanRecs = ScanStore.load(this);
-        for (M3uParser.Channel c : allChannels) {
-            if (ChannelScan.verdictOf(scanRecs, c.url)
-                    != ChannelScan.V_DEAD) presented++;
-        }
+        // The title count is a presented count: every channel on
+        // the shelf counts, scan-dead included (fixpass-0201 —
+        // they are presented now, marked, in every view; a count
+        // that excluded them would say a smaller shelf than the
+        // one standing). The scan's own dead numbers live on the
+        // scan line, from the scan record itself.
+        int presented = allChannels.size();
         countView.setText(presented + " "
                 + LangStore.tr(this, "live_channels_suffix"));
     }
@@ -1248,54 +1264,72 @@ public class MainActivity extends Activity {
         int hiddenDead = 0;
         int scanSetAside = 0;
         for (M3uParser.Channel c : allChannels) {
-            // THE CHAFF ASIDE (fixpass-0200, item 13; James:
-            // "separate the chaff from the wheat"): a link the scan
-            // proved dead is SET ASIDE, never deleted and never
-            // mixed into the wheat. In the default display it is
-            // collected here and shown in its own final section,
-            // still tappable — the player's walk is the final word.
-            // In every other mode (search, facets, tiles, language,
-            // favorites) it stays off that display exactly as
-            // before, and the count below still says so. The scan's
-            // verdict logic itself is untouched — this only decides
-            // where a convicted link is PRESENTED.
-            if (ScanStore.verdictOf(this, c.url) == ChannelScan.V_DEAD) {
-                scanSetAside++;
-                if (defaultDisplay) setAside.add(c);
-                continue;
-            }
-            if (favMode && !favorites.contains(c.url)) continue;
-            if (!allGenres && !favMode && !c.group.equals(genre)) continue;
+            // REACHABILITY (fixpass-0201; James's law 2026-11-05:
+            // a verdict is a label and an order, never a removal).
+            // A link the scan proved dead passes through the SAME
+            // facet, query, favorites and tile filters as any other
+            // channel — the pure Reachability.decide() makes the
+            // call — and where it lands it stands INCLUDED, marked
+            // in setAsideUrls so the adapter prints its why (scan
+            // reason + checked date) exactly as a set-aside row
+            // does. In the default display it is still collected
+            // into the Set aside section, exactly as 0.20.0 has it
+            // ("separate the chaff from the wheat" — separated,
+            // not vanished). The scan's verdict logic itself is
+            // untouched — this only decides where a convicted link
+            // is PRESENTED, and the answer is now: everywhere it
+            // belongs, wearing its mark.
+            int scanVerdict = ScanStore.verdictOf(this, c.url);
+            boolean genreOk = allGenres || favMode
+                    || c.group.equals(genre);
+            boolean langOk = true;
             if (!allLangs) {
-                if (NOT_SPECIFIED.equals(lang)) {
-                    if (!c.language.isEmpty()) continue;
-                } else if (!c.language.equals(lang)) continue;
+                langOk = NOT_SPECIFIED.equals(lang)
+                        ? c.language.isEmpty()
+                        : c.language.equals(lang);
             }
+            boolean countryOk = true;
             if (!allCountries) {
-                if (NOT_SPECIFIED.equals(country)) {
-                    if (!c.country.isEmpty()) continue;
-                } else if (!c.country.equals(country)) continue;
+                countryOk = NOT_SPECIFIED.equals(country)
+                        ? c.country.isEmpty()
+                        : c.country.equals(country);
             }
-            if (!q.isEmpty() && !ChannelNames.matchesQuery(c, q)) continue;
+            boolean queryOk = q.isEmpty()
+                    || ChannelNames.matchesQuery(c, q);
+            // "Working links only" hides only what a probe has
+            // PROVEN dead — unchecked links stay, wearing their "?".
+            // The toggle is the user's own and stays the only
+            // hider, unchanged, for every channel alike.
+            boolean workingDead = false;
             if (workingOnly) {
-                // "Working links only" hides only what a probe has
-                // PROVEN dead — unchecked links stay, wearing their "?".
                 HealthStore.Health h = HealthStore.get(this, c.url);
-                if (h != null && h.tier == LinkHealth.TIER_DEAD) {
-                    hiddenDead++;
-                    continue;
-                }
+                workingDead = h != null
+                        && h.tier == LinkHealth.TIER_DEAD;
             }
             // Tile filters (v0.12.1): the active service/section
             // tiles narrow the same list the facets narrow.
-            if (!activeService.isEmpty()
-                    && !activeService.equals(
-                            LiveGroups.serviceOf(c, svcByBase))) {
+            boolean serviceOk = activeService.isEmpty()
+                    || activeService.equals(
+                            LiveGroups.serviceOf(c, svcByBase));
+            boolean sectionOk = activeSection.isEmpty()
+                    || LiveGroups.sectionsOf(c).contains(activeSection);
+            int placement = Reachability.decide(scanVerdict,
+                    defaultDisplay, favMode, favorites.contains(c.url),
+                    genreOk, langOk, countryOk, queryOk,
+                    workingDead, serviceOk, sectionOk);
+            if (placement == Reachability.SET_ASIDE) {
+                scanSetAside++;
+                setAside.add(c);
                 continue;
             }
-            if (!activeSection.isEmpty()
-                    && !LiveGroups.sectionsOf(c).contains(activeSection)) {
+            if (placement == Reachability.EXCLUDE) continue;
+            if (placement == Reachability.EXCLUDE_WORKING_DEAD) {
+                hiddenDead++;
                 continue;
+            }
+            if (placement == Reachability.INCLUDE_MARKED) {
+                scanSetAside++;
+                setAsideUrls.add(c.url);
             }
             filtered.add(c);
         }
@@ -1336,12 +1370,12 @@ public class MainActivity extends Activity {
             // tier so the current list order stands inside it.
             // The standing sort mode does NOT apply here — the
             // search ranking wins while a query is in the box.
-            // Scan-dead channels are NOT in these results: they
-            // were set aside at collection above and search keeps
-            // today's behavior (out of the results, count said in
-            // the status line) — the aside lives only in the
-            // default display (item 13).
-            rankBySearchQuery(filtered, q);
+            // Scan-dead matches ARE in these results (fixpass-0201):
+            // marked like every other restored row, and ranked
+            // below live matches of the same tier by
+            // Reachability.searchOrder — findable, never first
+            // over the living.
+            rankBySearchQuery(filtered, q, setAsideUrls);
             for (M3uParser.Channel c : filtered) {
                 displayRows.add(c);
                 displayChannels.add(c);
@@ -1446,12 +1480,15 @@ public class MainActivity extends Activity {
             if (favMode && displayChannels.isEmpty()) {
                 statusView.setText("No favorites yet — tap the ☆ on any channel to keep it here.");
             } else if (!unfiltered || workingOnly || scanSetAside > 0) {
-                // The match count is the WHEAT count: channels in
-                // the set-aside section are on the display (and in
-                // displayChannels / the play queue) but they are
-                // not matches — they are said separately, in plain
-                // words, as set aside (item 13: the status line
-                // keeps saying the set-aside count).
+                // In the default display the match count is the
+                // WHEAT count: channels in the set-aside section
+                // are on the display (and in displayChannels / the
+                // play queue) but they are said separately, in
+                // plain words, as set aside. In every other mode
+                // (fixpass-0201) marked scan-dead channels stand IN
+                // the result list and count as the matches they
+                // are; the line still says how many stand marked,
+                // as set aside by scan.
                 statusView.setText((displayChannels.size() - setAsideShown)
                         + " channels match — "
                         + genre + " · " + lang + " · " + country
@@ -1956,15 +1993,12 @@ public class MainActivity extends Activity {
         scanWasRunning = running;
     }
 
-    /** Recompute the title's presented count after verdicts land. */
+    /** Recompute the title's presented count after verdicts land.
+     *  Presented means presented (fixpass-0201): scan-dead channels
+     *  stand marked in every view, so they count here too. */
     private void refreshCountsLine() {
         if (countView == null || allChannels == null) return;
-        int presented = 0;
-        Map<String, ChannelScan.Rec> scanRecs = ScanStore.load(this);
-        for (M3uParser.Channel c : allChannels) {
-            if (ChannelScan.verdictOf(scanRecs, c.url)
-                    != ChannelScan.V_DEAD) presented++;
-        }
+        int presented = allChannels.size();
         countView.setText(presented + " "
                 + LangStore.tr(this, "live_channels_suffix"));
     }
@@ -2062,7 +2096,9 @@ public class MainActivity extends Activity {
             String guideLine = guideLineFor(c);
             String subText = guideLine.isEmpty() ? subLine.toString()
                     : guideLine + "\n" + subLine;
-            // A SET-ASIDE row (item 13) carries its WHY first, in
+            // A MARKED row (item 13's set-aside rows, and since
+            // fixpass-0201 every scan-dead row in every view)
+            // carries its WHY first, in
             // plain words from its scan record — see setAsideWhy.
             // The row stays an ordinary tappable channel row in
             // every other respect (tap plays via playChannel; the
