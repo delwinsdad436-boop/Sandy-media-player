@@ -31,8 +31,9 @@ import java.util.Locale;
  */
 public final class CrashGuard {
 
-    /** Version stamp written as the first line of every crash log. */
-    public static final String VERSION_STAMP = "Sandy 0.18.0 (versionCode 24)";
+    /** Version stamp written as the first line of every crash log.
+     *  One version, one place (v0.19.0): AppVersion owns it. */
+    public static final String VERSION_STAMP = AppVersion.STAMP;
 
     private static volatile boolean installed = false;
 

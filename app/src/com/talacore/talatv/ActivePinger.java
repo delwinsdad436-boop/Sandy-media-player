@@ -251,7 +251,14 @@ public final class ActivePinger {
             c.setReadTimeout(PING_TIMEOUT_MS);
             c.setInstanceFollowRedirects(true);
             c.setRequestProperty("User-Agent",
-                    ua == null || ua.isEmpty() ? "Sandy/0.14.1" : ua);
+                    ua == null || ua.isEmpty() ? AppVersion.UA : ua);
+            // v0.19.0: the pinger knocks the way the player
+            // does — a referer-gated door must not look dead
+            // to the pinger while it plays fine (DoorHeaders).
+            String referer = DoorHeaders.refererFor(url);
+            if (!referer.isEmpty()) {
+                c.setRequestProperty("Referer", referer);
+            }
             if (range != null) c.setRequestProperty("Range", range);
             g.code = c.getResponseCode();
             InputStream in = g.code >= 400

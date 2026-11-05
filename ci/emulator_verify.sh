@@ -26,8 +26,16 @@ sleep 15
 PID=$(adb shell pidof com.talacore.talatv || true)
 echo "app pid: $PID"
 adb shell dumpsys activity activities > "$OUT/activities.txt" || true
-adb shell screencap -p /sdcard/shot.png || true
-adb pull /sdcard/shot.png "$OUT/screenshot.png" || true
+# Screenshot: stream the PNG over stdout with exec-out. Run #12 (2026-10-24)
+# proved the old route broken: screencap to /sdcard worked but `adb pull`
+# was refused on permission, so no picture came home. exec-out never
+# touches the sdcard or pull. The old route stays as fallback only if
+# the streamed file comes back empty.
+adb exec-out screencap -p > "$OUT/screenshot.png" || true
+if [ ! -s "$OUT/screenshot.png" ]; then
+  adb shell screencap -p /sdcard/shot.png || true
+  adb pull /sdcard/shot.png "$OUT/screenshot.png" || true
+fi
 adb logcat -d > "$OUT/logcat.txt" || true
 if [ -z "$PID" ]; then echo "LAUNCH VERDICT: FAIL - process not alive after launch"; exit 1; fi
 if grep -A3 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "talacore"; then echo "LAUNCH VERDICT: FAIL - fatal exception for the app"; exit 1; fi

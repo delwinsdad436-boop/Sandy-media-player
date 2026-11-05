@@ -1245,12 +1245,20 @@ public class PlayerActivity extends Activity {
         }
 
         String ua = (c.userAgent == null || c.userAgent.isEmpty())
-                ? "Sandy/0.14.1" : c.userAgent;
+                ? AppVersion.UA : c.userAgent;
         DefaultHttpDataSource.Factory dsFactory = new DefaultHttpDataSource.Factory()
                 .setUserAgent(ua)
                 .setConnectTimeoutMs(15000)
                 .setReadTimeoutMs(15000)
                 .setAllowCrossProtocolRedirects(true);
+        // v0.19.0: this plain path (uncached live, on-demand)
+        // knocks with the same door manner as the cached one —
+        // the playlist's origin as Referer (see DoorHeaders).
+        java.util.Map<String, String> doorProps =
+                DoorHeaders.requestPropertiesFor(c.url);
+        if (!doorProps.isEmpty()) {
+            dsFactory.setDefaultRequestProperties(doorProps);
+        }
 
         // Sidecar subtitles ride only with the on-demand title they
         // came from — plus, from 0.6.1, a sidecar this phone just
@@ -1321,7 +1329,7 @@ public class PlayerActivity extends Activity {
                 liveDs = Downloads.playbackFactory(this);
             } else if (liveNow && !forceUncached) {
                 liveDs = TimeshiftCache.liveFactory(this, ua,
-                        ChannelStore.getTimeshiftMinutes(this));
+                        ChannelStore.getTimeshiftMinutes(this), c.url);
             } else {
                 liveDs = dsFactory;
             }
@@ -1334,7 +1342,7 @@ public class PlayerActivity extends Activity {
                 vodDs = Downloads.playbackFactory(this);
             } else if (liveNow && !forceUncached) {
                 vodDs = TimeshiftCache.liveFactory(this, ua,
-                        ChannelStore.getTimeshiftMinutes(this));
+                        ChannelStore.getTimeshiftMinutes(this), c.url);
             } else {
                 vodDs = dsFactory;
             }
@@ -3034,7 +3042,7 @@ public class PlayerActivity extends Activity {
         M3uParser.Channel c = queue.get(index);
         if (c == null || !LinkHealth.isRemote(c.url)) return;
         String ua = (c.userAgent == null || c.userAgent.isEmpty())
-                ? "Sandy/0.14.1" : c.userAgent;
+                ? AppVersion.UA : c.userAgent;
         pinger = new ActivePinger(c.url, ua, pingerListener);
         pinger.start();
     }

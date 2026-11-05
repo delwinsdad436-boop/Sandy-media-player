@@ -125,12 +125,13 @@ public final class TimeshiftCache {
      */
     public static synchronized DataSource.Factory liveFactory(Context ctx,
                                                               String userAgent,
-                                                              int capMinutes) {
+                                                              int capMinutes,
+                                                              String pageUrl) {
         Cache c = cache(ctx.getApplicationContext(),
                 TimeshiftMath.byteCapForMinutes(capMinutes));
         DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
                 .setUserAgent(userAgent == null || userAgent.isEmpty()
-                        ? "Sandy/0.14.1" : userAgent)
+                        ? AppVersion.UA : userAgent)
                 // media3's defaults (8 s/8 s), stated on purpose
                 // since v0.14.1: a segment leg that hangs longer
                 // than this is a dead leg, and the continuity
@@ -139,6 +140,16 @@ public final class TimeshiftCache {
                 .setConnectTimeoutMs(8000)
                 .setReadTimeoutMs(8000)
                 .setAllowCrossProtocolRedirects(true);
+        // v0.19.0: segment fetches knock with the playlist's
+        // origin as Referer — the manner the v0.14.1 diagnosis
+        // named and the source never actually sent (see
+        // DoorHeaders). Closes the refusal at the window
+        // boundary instead of only recovering from it.
+        java.util.Map<String, String> doorProps =
+                DoorHeaders.requestPropertiesFor(pageUrl);
+        if (!doorProps.isEmpty()) {
+            http.setDefaultRequestProperties(doorProps);
+        }
         CacheDataSource.Factory f = new CacheDataSource.Factory()
                 .setCache(c)
                 .setUpstreamDataSourceFactory(http)

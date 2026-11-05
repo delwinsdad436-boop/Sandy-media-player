@@ -195,6 +195,14 @@ public final class LinkHealth {
                 conn.setReadTimeout(timeoutMs);
                 conn.setInstanceFollowRedirects(false);   // probe() follows by hand (http->https too)
                 conn.setRequestProperty("User-Agent", userAgent);
+                // v0.19.0: the probe knocks the way the player
+                // will — a door that would refuse the player's
+                // segments must not pass the probe bare (see
+                // DoorHeaders).
+                String referer = DoorHeaders.refererFor(url);
+                if (!referer.isEmpty()) {
+                    conn.setRequestProperty("Referer", referer);
+                }
                 int code = conn.getResponseCode();
                 String location = conn.getHeaderField("Location");
                 String head = "";
@@ -348,7 +356,7 @@ public final class LinkHealth {
             // on-device file (My Library): it is here by definition
             return r.finish(TIER_PLAYS, true, "on this phone");
         }
-        String ua = (userAgent == null || userAgent.isEmpty()) ? "Sandy/0.14.1" : userAgent;
+        String ua = (userAgent == null || userAgent.isEmpty()) ? AppVersion.UA : userAgent;
 
         // Direct media file: the file answering with bytes IS the video
         // answering — there is no playlist layer to hide behind.

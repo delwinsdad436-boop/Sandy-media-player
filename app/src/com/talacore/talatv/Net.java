@@ -32,7 +32,8 @@ import java.util.Map;
  */
 public final class Net {
 
-    public static final String UA = "Sandy/0.18.0";
+    /** One version, one place (v0.19.0): AppVersion owns it. */
+    public static final String UA = AppVersion.UA;
 
     private Net() {}
 
@@ -109,6 +110,12 @@ public final class Net {
                 conn.setConnectTimeout(CONNECT_MS);
                 conn.setReadTimeout(READ_MS);
                 conn.setRequestProperty("User-Agent", UA);
+                // v0.19.0: knock like a player — gated doors
+                // refuse a bare fetch (see DoorHeaders).
+                String referer = DoorHeaders.refererFor(current);
+                if (!referer.isEmpty()) {
+                    conn.setRequestProperty("Referer", referer);
+                }
                 conn.setInstanceFollowRedirects(false);
                 int code = conn.getResponseCode();
                 h.code = code;

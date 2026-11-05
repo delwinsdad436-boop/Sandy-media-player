@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
  *  - A source that refuses (403, DRM, a non-HLS protocol the
  *    downloader can't take) fails the download, and the shelf shows
  *    the failure plainly instead of a fake recording.
- *  - One fixed user agent rides on recordings ("Sandy/0.14.1") —
+ *  - One fixed user agent rides on recordings (AppVersion.UA) —
  *    media3's stock downloaders don't take per-request headers, so a
  *    stream that gates on a special user agent can refuse; the
  *    failure is shown, not hidden.
@@ -63,7 +63,7 @@ public final class Downloads {
                     .setCache(cache)
                     .setUpstreamDataSourceFactory(
                             new DefaultHttpDataSource.Factory()
-                                    .setUserAgent("Sandy/0.14.1")
+                                    .setUserAgent(AppVersion.UA)
                                     .setAllowCrossProtocolRedirects(true))
                     .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
             // (Context, DatabaseProvider, Cache, DataSource.Factory,
@@ -99,7 +99,7 @@ public final class Downloads {
                 .setCache(cache)
                 .setUpstreamDataSourceFactory(
                         new DefaultHttpDataSource.Factory()
-                                .setUserAgent("Sandy/0.14.1")
+                                .setUserAgent(AppVersion.UA)
                                 .setAllowCrossProtocolRedirects(true))
                 .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
     }
@@ -128,6 +128,15 @@ public final class Downloads {
         try {
             DownloadRequest.Builder b = new DownloadRequest.Builder(url, Uri.parse(url));
             if (hls) b.setMimeType(MimeTypes.APPLICATION_M3U8);
+            // v0.19.0, named limit: a recording cannot knock
+            // with a Referer — the staged media3 (1.4.1)
+            // DownloadRequest carries no per-request headers
+            // (javap-verified against the staged classes), and
+            // the shared download data source cannot hold one
+            // origin's Referer for every recording. The player,
+            // the probe, the pinger and Net all knock since
+            // 0.19.0 (see DoorHeaders); recordings join them
+            // when media3 grows the door.
             m.addDownload(b.build());
             return true;
         } catch (Throwable e) {

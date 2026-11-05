@@ -401,7 +401,7 @@ public class SettingsActivity extends Activity {
         }
 
         root.addView(header("About"));
-        root.addView(body("Sandy 0.14.1 — a television for the family. It hosts "
+        root.addView(body(AppVersion.STAMP + " — a television for the family. It hosts "
                 + "nothing: it finds and plays the free channels and the "
                 + "shelves you load into it. What it keeps is yours: your "
                 + "favorites, your places, your recordings. Made by "

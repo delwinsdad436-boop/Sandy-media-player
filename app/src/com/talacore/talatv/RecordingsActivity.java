@@ -141,7 +141,7 @@ public class RecordingsActivity extends Activity {
         Intent i = new Intent(this, PlayerActivity.class);
         i.putExtra("url", c.url);
         i.putExtra("name", name);
-        i.putExtra("ua", "Sandy/0.14.1");
+        i.putExtra("ua", AppVersion.UA);
         i.putExtra("ckey", "rec:" + d.request.id);
         i.putExtra("recording", true);
         if (autoTranslate) i.putExtra("autoTranslate", true);
