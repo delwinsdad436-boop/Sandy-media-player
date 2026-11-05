@@ -588,7 +588,7 @@ public class V200Test {
                 UiStrings.lookup("en", "translator_cant").contains("%s → %s"));
         check("door cant carries both slots (fa)",
                 UiStrings.lookup("fa", "translator_cant").contains("%s"));
-        checkEq("door keys total", 456, UiStrings.KEYS.length);
+        checkEq("door keys total", 458, UiStrings.KEYS.length);
         check("door tables still complete", UiStrings.tablesComplete());
     }
 
@@ -2243,7 +2243,7 @@ public class V200Test {
     }
 
     static void uiStringsReader() {
-        checkEq("uistrings keys grew to 456", 456, UiStrings.KEYS.length);
+        checkEq("uistrings keys grew to 458", 458, UiStrings.KEYS.length);
         check("uistrings reader keys complete in all tables",
                 UiStrings.tablesComplete());
         for (String k : new String[]{"share_unavailable", "lib_books_btn",
@@ -6626,8 +6626,8 @@ public class V200Test {
         checkEq("sections: fixture counts reconcile", 6, total);
         checkEq("sections: every channel in exactly one section",
                 6, seen.size());
-        checkEq("sections: display order is the named head, Other last",
-                List.of("News", "Sports", "Movies", "Kids", "Other"),
+        checkEq("sections: categories stand pure A-Z, Other last",
+                List.of("Kids", "Movies", "News", "Sports", "Other"),
                 new ArrayList<>(grouped.keySet()));
         // The REAL seed map: every channel it names lands in exactly
         // one section, and the section counts reconcile to its total.
@@ -6665,6 +6665,18 @@ public class V200Test {
         checkEq("sections: every seed channel in exactly one section",
                 seed.size(), seedSeen.size());
         checkEq("sections: Other is last over the seed too", "Other", lastKey);
+        List<String> seedKeys = new ArrayList<>(seedGrouped.keySet());
+        List<String> catsOnly = seedKeys.subList(0, seedKeys.size() - 1);
+        List<String> catsSorted = new ArrayList<>(catsOnly);
+        catsSorted.sort(String.CASE_INSENSITIVE_ORDER);
+        checkEq("sections: seed categories stand pure A-Z",
+                catsSorted, catsOnly);
+        check("sections: the A-Z list flip is wired and persisted",
+                srcText("MainActivity").contains("live_view")
+                        && srcText("MainActivity")
+                                .contains("live_view_categories")
+                        && srcText("MainActivity")
+                                .contains("live_view_az_list"));
         check("sections: the default display is the sectioned list",
                 srcText("MainActivity").contains("groupByPrimarySection"));
         check("sections: the chaff is set aside, labeled, never dropped",

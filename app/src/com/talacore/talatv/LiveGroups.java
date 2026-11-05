@@ -1,8 +1,6 @@
 package com.talacore.talatv;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -136,15 +134,6 @@ public final class LiveGroups {
     public static final String OTHER_SECTION = "Other";
 
     /**
-     * The standing head of the section order: the rooms a viewer
-     * looks for first, in this order. Any section not named here
-     * follows them A–Z, and {@link #OTHER_SECTION} is always last.
-     */
-    public static final List<String> SECTION_ORDER =
-            Collections.unmodifiableList(Arrays.asList(
-                    "News", "Sports", "Movies", "Kids", "Music"));
-
-    /**
      * A channel's ONE primary section: the FIRST section in
      * {@link #sectionsOf} order (the database's own category
      * order, at most two, else the playlist group), or
@@ -155,25 +144,33 @@ public final class LiveGroups {
         return s.isEmpty() ? OTHER_SECTION : s.get(0);
     }
 
-    /** Standing rank of a section name (see {@link #SECTION_ORDER}):
-     *  named rooms by their place, unnamed rooms after them,
-     *  "Other" after everything. */
+    /**
+     * Standing rank of a section name under the section order
+     * (fixpass-0200, item 13 refinement — James: categories
+     * alphabetical BY CATEGORY): real categories all rank equal
+     * and stand in pure A–Z order (case-insensitive) between
+     * themselves; "Other" is NOT a category, so it ranks after
+     * everything. (This replaces the earlier named-head order —
+     * News, Sports, Movies, Kids, Music first — and the
+     * SECTION_ORDER constant that carried it: nothing else in
+     * the tree referenced that constant, and a named head is no
+     * longer the rule, so the constant is gone rather than left
+     * standing as a false description of the order.)
+     */
     public static int sectionRank(String section) {
         if (section == null || OTHER_SECTION.equalsIgnoreCase(section)) {
             return Integer.MAX_VALUE;
         }
-        for (int i = 0; i < SECTION_ORDER.size(); i++) {
-            if (SECTION_ORDER.get(i).equalsIgnoreCase(section)) return i;
-        }
-        return SECTION_ORDER.size();
+        return 0;
     }
 
     /**
      * Primary-section grouping for the default display: section
      * name → its channels, each channel in EXACTLY ONE section
-     * (its {@link #primarySectionOf}). Sections are ordered by
-     * {@link #sectionRank}, ties A–Z (case-insensitive), "Other"
-     * last. Channels inside a section keep their INCOMING order —
+     * (its {@link #primarySectionOf}). Sections stand in PURE
+     * A–Z order (case-insensitive) — categories alphabetical by
+     * category — with "Other" last (see {@link #sectionRank}).
+     * Channels inside a section keep their INCOMING order —
      * the caller's standing sort applies inside the section,
      * never here.
      */

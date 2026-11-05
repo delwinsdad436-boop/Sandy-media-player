@@ -123,6 +123,19 @@ public class MainActivity extends Activity {
     // nobody's list moves unless they ask.
     private SortOrders.Mode liveSort = SortOrders.Mode.DEFAULT;
     private Button sortBtn;
+    // View flip (fixpass-0200, item 13 refinement — James:
+    // "categorize on live channels. By a category, yes, but also
+    // alphabetical by category. Or alphabetical by list"): the
+    // default display has TWO shapes, one flip away. Categories
+    // (false) is what item 13 shipped — Her Channels, then the
+    // A–Z category sections, then Other, then the set-aside.
+    // A–Z list (true) is Her Channels, then ONE straight
+    // alphabetical list of the same wheat, then the set-aside
+    // as its own section. Persisted in this activity's
+    // preferences exactly like live_sort (key "live_view", an
+    // int, bounds-checked on restore, written on flip).
+    private boolean liveAzList = false;
+    private Button viewBtn;
     /** Filed guide data for now/next lines (v0.11.0); null until loaded. */
     private volatile GuideModel.GuideData guideData;
     // Staged warm-up proof (fixpass-0200, item 14): the favorites
@@ -154,6 +167,14 @@ public class MainActivity extends Activity {
         SortOrders.Mode[] sortModes = SortOrders.Mode.values();
         if (sortOrd >= 0 && sortOrd < sortModes.length) {
             liveSort = sortModes[sortOrd];
+        }
+        // View flip (item 13 refinement): restore the standing
+        // shape the same way — an int in this activity's own
+        // preferences, bounds-checked before it is trusted
+        // (0 = Categories, 1 = A–Z list).
+        int viewOrd = getPreferences(MODE_PRIVATE).getInt("live_view", 0);
+        if (viewOrd >= 0 && viewOrd < 2) {
+            liveAzList = viewOrd == 1;
         }
 
         // v0.17.0 THE SANCTUARY LAYOUT: the sanctuary ground.
@@ -292,6 +313,19 @@ public class MainActivity extends Activity {
         sortBtn.setOnClickListener(v -> cycleLiveSort());
         updateSortButton();
         controlRow.addView(sortBtn);
+        // The View flip (fixpass-0200, item 13 refinement): in the
+        // same control row as Sort, labeled with the CURRENT shape
+        // the way the Sort button shows the standing mode — one
+        // tap trades the category sections for one straight A–Z
+        // list, or back. In A–Z list view the Sort button hides
+        // (the flip IS the sort choice there); the standing sort
+        // mode still governs Category view on the flip back (see
+        // updateViewButton).
+        viewBtn = new Button(this);
+        Sanctuary.styleButton(this, viewBtn, false);
+        viewBtn.setOnClickListener(v -> flipLiveView());
+        updateViewButton();
+        controlRow.addView(viewBtn);
         chrome.addView(controlRow);
 
         LinearLayout facetRow = new LinearLayout(this);
@@ -695,6 +729,44 @@ public class MainActivity extends Activity {
         getPreferences(MODE_PRIVATE).edit()
                 .putInt("live_sort", liveSort.ordinal()).apply();
         updateSortButton();
+        rebuildDisplay();
+    }
+
+    // ------------------------------------------------------- view flip
+
+    /** The standing shape's own label, from the view string keys. */
+    private String liveViewLabel() {
+        return LangStore.tr(this,
+                liveAzList ? "live_view_az_list" : "live_view_categories");
+    }
+
+    private void updateViewButton() {
+        if (viewBtn == null) return;
+        // Built the way the Sort button's label is built — a
+        // "View:" prefix before the standing shape's name, so the
+        // current shape reads at a glance. (No "view" label key
+        // stands in UiStrings; the prefix is carried here the way
+        // trOr carries not-yet-landed text, and the shape names
+        // themselves come from the live_view_* keys.)
+        String label = "View: " + liveViewLabel();
+        viewBtn.setText(label);
+        viewBtn.setContentDescription(label);
+        // In A–Z list view the flip IS the sort choice, so the
+        // Sort button hides; liveSort itself is untouched and
+        // governs Category view again the moment she flips back.
+        if (sortBtn != null) {
+            sortBtn.setVisibility(liveAzList ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /** One tap flips the shape and files the pick, exactly the
+     *  way cycleLiveSort files the sort — standing across opens
+     *  until the viewer flips it back. */
+    private void flipLiveView() {
+        liveAzList = !liveAzList;
+        getPreferences(MODE_PRIVATE).edit()
+                .putInt("live_view", liveAzList ? 1 : 0).apply();
+        updateViewButton();
         rebuildDisplay();
     }
 
@@ -1164,8 +1236,9 @@ public class MainActivity extends Activity {
         boolean tileActive = !activeService.isEmpty() || !activeSection.isEmpty();
         // THE DEFAULT DISPLAY (fixpass-0200, item 13): no search
         // query, no facet picked, no tile filter, not favorites —
-        // the primary-section list with the set-aside section at
-        // its bottom. Every other mode keeps its own shape below.
+        // the standing view-flip shape (category sections, or the
+        // A–Z list) with the set-aside section at its bottom.
+        // Every other mode keeps its own shape below.
         boolean defaultDisplay = allGenres && allLangs && allCountries
                 && q.isEmpty() && !favMode && !tileActive;
 
@@ -1296,22 +1369,41 @@ public class MainActivity extends Activity {
                         byCountry.get(co), displayOrder);
             }
         } else if (defaultDisplay) {
-            // DEFAULT BROWSING (fixpass-0200, item 13): PRIMARY-
-            // SECTION rooms — each channel in EXACTLY ONE section,
-            // its first section in LiveGroups.sectionsOf order,
-            // else "Other" (LiveGroups.primarySectionOf). Sections
-            // stand in LiveGroups' standing order (News, Sports,
-            // Movies, Kids, Music, then the rest A–Z, "Other" last);
-            // inside a section the standing sort (displayOrder)
-            // applies through addSection, as in every sectioned
-            // view. This replaces the old genre rooms (by playlist
-            // group) for the default display only. Browse mode
-            // shows this same display — it only collapses chrome.
-            Map<String, List<M3uParser.Channel>> bySection =
-                    LiveGroups.groupByPrimarySection(filtered);
-            for (Map.Entry<String, List<M3uParser.Channel>> e
-                    : bySection.entrySet()) {
-                addSection(e.getKey(), e.getValue(), displayOrder);
+            // DEFAULT BROWSING (fixpass-0200, item 13, as refined):
+            // the standing shape is the VIEW FLIP's pick.
+            // CATEGORY VIEW: PRIMARY-SECTION rooms — each channel
+            // in EXACTLY ONE section, its first section in
+            // LiveGroups.sectionsOf order, else "Other"
+            // (LiveGroups.primarySectionOf). Sections stand in
+            // pure A–Z order, "Other" last (LiveGroups'
+            // groupByPrimarySection); inside a section the
+            // standing sort (displayOrder) applies through
+            // addSection, as in every sectioned view.
+            // A–Z LIST VIEW: ONE straight alphabetical list of the
+            // same wheat — SortOrders AZ over the whole set, no
+            // section headers at all — so prove-on-view's backward
+            // header scan finds no header above a wheat row and
+            // queues nothing, exactly as it does over any flat
+            // list; no special case is needed here or there.
+            // Both shapes replace the old genre rooms (by playlist
+            // group) for the default display only, and browse mode
+            // shows whichever shape is standing — it only
+            // collapses chrome.
+            if (liveAzList) {
+                List<M3uParser.Channel> azList = SortOrders.order(
+                        filtered, SortOrders.Mode.AZ,
+                        c -> c.displayName());
+                for (M3uParser.Channel c : azList) {
+                    displayRows.add(c);
+                    displayChannels.add(c);
+                }
+            } else {
+                Map<String, List<M3uParser.Channel>> bySection =
+                        LiveGroups.groupByPrimarySection(filtered);
+                for (Map.Entry<String, List<M3uParser.Channel>> e
+                        : bySection.entrySet()) {
+                    addSection(e.getKey(), e.getValue(), displayOrder);
+                }
             }
             // THE SET-ASIDE, last of all — after "Other", never
             // above the wheat. Same header-row mechanism/styling

@@ -1068,7 +1068,10 @@ public class HomeActivity extends Activity {
         if (entries.isEmpty()) return;
         TextView header = new TextView(this);
         header.setText(LangStore.tr(this, "continue_watching"));
-        header.setTextColor(Sanctuary.INK);
+        // Motif (fixpass-0200, item 4 refinement): section headers
+        // wear Sandy's gold — Sanctuary.goldText (GOLD_TEXT, the
+        // wordmark's token) at the restyle's 20sp bold, not white.
+        Sanctuary.goldText(header);
         header.setTextSize(Sanctuary.TEXT_SECTION);
         header.setTypeface(header.getTypeface(), Typeface.BOLD);
         header.setPadding(0, dp(Sanctuary.SECTION_GAP_DP), 0, dp(10));
@@ -1274,7 +1277,7 @@ public class HomeActivity extends Activity {
         if (shows == null || shows.isEmpty()) return;
         TextView header = new TextView(this);
         header.setText(title);
-        header.setTextColor(Sanctuary.INK);
+        Sanctuary.goldText(header);
         header.setTextSize(Sanctuary.TEXT_SECTION);
         header.setTypeface(header.getTypeface(), Typeface.BOLD);
         header.setPadding(0, dp(Sanctuary.SECTION_GAP_DP), 0, dp(10));
@@ -1368,7 +1371,7 @@ public class HomeActivity extends Activity {
         if (shows == null) shows = new ArrayList<>();
         TextView header = new TextView(this);
         header.setText(shelfName + " — " + shows.size() + " shows");
-        header.setTextColor(Sanctuary.INK);
+        Sanctuary.goldText(header);
         header.setTextSize(Sanctuary.TEXT_SECTION);
         header.setTypeface(header.getTypeface(), Typeface.BOLD);
         header.setPadding(0, dp(Sanctuary.SECTION_GAP_DP), 0, dp(10));
