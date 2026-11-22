@@ -1,9 +1,9 @@
-linkcheck rotation 2026-11-22T02:22:26Z
+linkcheck rotation 2026-11-22T12:44:35Z
 map rows: 11356  (gone 0, non-http 9, never-checked & inactive 0)
 active set: 3024  (watchlist 0, facet-standing 3024, view-active 0)
 decayed out this run: 0
 probed this run: 1200 of 1200 selected
-verdicts: DEAD 180, LISTED 271, LIVE 638, UNKNOWN 111
+verdicts: DEAD 172, LISTED 272, LIVE 644, UNKNOWN 112
 rows updated: 1200
-oldest active verdict age: 35d15h (since 2026-10-17T10:41:00Z)
-elapsed: 268s
+oldest active verdict age: 36d2h (since 2026-10-17T10:41:00Z)
+elapsed: 287s
